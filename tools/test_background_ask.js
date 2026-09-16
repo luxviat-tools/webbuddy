@@ -222,7 +222,37 @@ function sendMessage(listeners, msg, sender) {
     ok('没有发送方标签页时拒绝', res && res.ok === false, JSON.stringify(res));
   }
 
-  console.log('\n=== F. 侧边栏被拦时不崩，任务仍然留下 ===');
+  console.log('\n=== F. sidePanel.open 必须在【同步路径】被调用（手势回归守卫）===');
+  {
+    /*
+     * 本轮修的 bug，最容易悄悄回归：
+     * sidePanel.open() 的用户手势标记只存活约 1ms，它前面只要出现一次 await，
+     * Chrome 就静默忽略 → 面板打不开 → 用户看到「点了问题却没提问」。
+     * 断言方式：**同步**调用 handler，handler 一返回就立刻检查 open 是否已发生。
+     * 若将来有人把 open 改成 await 版本，这里会立刻变红。
+     */
+    const sw = makeSW();
+    for (const fn of sw.listeners.message) {
+      fn({ type: 'ask-selection', text: 'x', promptId: 'p1' }, { tab: { id: 5, title: 'T', url: 'https://e.com' } }, () => {});
+    }
+    ok('handler 同步返回时 open 已被调用（未落入异步间隙）', sw.calls.sidePanelOpen.length === 1, '实际调用次数 ' + sw.calls.sidePanelOpen.length);
+    ok('open 指向当前标签页', sw.calls.sidePanelOpen[0] && sw.calls.sidePanelOpen[0].tabId === 5, JSON.stringify(sw.calls.sidePanelOpen[0] || null));
+
+    // 对照：如果 open 前有 await，同步检查时应为 0 次
+    const swAsync = makeSW();
+    for (const fn of swAsync.listeners.message) {
+      // 人为制造一个微任务延迟再调用 open 的「坏实现」作为对照组
+      const original = swAsync.chrome.sidePanel.open;
+      swAsync.chrome.sidePanel.open = async (o) => {
+        await Promise.resolve();
+        return original(o);
+      };
+      fn({ type: 'ask-selection', text: 'x', promptId: 'p1' }, { tab: { id: 6, title: 'T', url: 'https://e.com' } }, () => {});
+    }
+    ok('对照组：await 版本在同步检查时尚未调用（证明断言有效）', swAsync.calls.sidePanelOpen.length === 0, '实际 ' + swAsync.calls.sidePanelOpen.length);
+  }
+
+  console.log('\n=== F2. 侧边栏被拦时不崩，任务仍然留下 ===');
   {
     const sw = makeSW();
     sw.chrome.sidePanel.open = async () => {
@@ -234,8 +264,7 @@ function sendMessage(listeners, msg, sender) {
       { tab: { id: 5, title: 'T', url: 'https://e.com' } }
     );
     await new Promise((r) => setTimeout(r, 30));
-    ok('仍然返回 ok（任务可被侧栏 catchUp 消费）', res && res.ok === true, JSON.stringify(res));
-    ok('opened=false 供气泡提示用户', res && res.opened === false, JSON.stringify(res));
+    ok('open 失败也不影响返回 ok（任务仍可被 catchUp 消费）', res && res.ok === true, JSON.stringify(res));
     ok('任务照样写入了', !!sw.store.session.task);
   }
 

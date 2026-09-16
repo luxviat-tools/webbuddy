@@ -9,6 +9,7 @@
 const TASK_KEY = 'task';            // storage.session：最新任务
 const THREAD_KEY = 'thread';        // storage.session：会话历史（仅浏览器会话内）
 const MARKER_KEY = 'processedTaskId'; // storage.session：面板已消费的任务标记
+const ACK_KEY = 'taskAck';            // storage.session：面板已消费任务的回执（供后台判断面板是否真的起来了）
 const CTX_KEY = 'pageCtx';          // storage.session：最近捕获的页面上下文（自由提问用）
 const IMG_KEY = 'imageControl';     // storage.local：图片控制配置 { mode }
 const AD_KEY = 'adBlock';           // storage.local：免广告配置 { enabled }

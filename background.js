@@ -257,6 +257,18 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   }
   // 划词气泡点了预设问题：开面板 + 派发任务（与右键菜单同一条链路）
   if (msg && msg.type === 'ask-selection') {
+    /*
+     * 【同步抢占用户手势】open() 必须在这个同步执行栈里调用，绝不能 await。
+     * 该 API 的手势标记只保留约 1ms，一旦先 await（哪怕是 await open 自身），
+     * Chrome 就会静默忽略 —— 面板打不开，用户看到的就是「点了没反应」。
+     * 与 contextMenus.onClicked 里的写法保持一致。
+     */
+    const askTabId = sender && sender.tab && sender.tab.id;
+    if (askTabId != null) {
+      try {
+        chrome.sidePanel.open({ tabId: askTabId }).catch(() => {});
+      } catch {}
+    }
     askFromSelection(msg, sender)
       .then((r) => sendResponse(r))
       .catch((e) => sendResponse({ ok: false, error: String((e && e.message) || e) }));
@@ -271,21 +283,15 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 });
 
 /*
- * 划词气泡入口：content script 点预设问题 → 这里负责开侧边栏并写任务。
- * open() 必须在用户手势有效期内【同步】调用，所以放在最前面（同右键菜单路径）。
- * 手势从 content script 的 click 经 runtime 消息传过来，正常情况下能开；
- * 万一被拦，任务已写好，用户手动点工具栏图标后面板 init 的 catchUpTask 也会补上。
+ * 划词气泡入口：只负责组装并写任务，**开面板的动作已在 onMessage 里同步完成**。
+ * 这里再 await 一次 open 会让手势失效（见 onMessage 处的说明），所以不要把它搬回来。
+ * 面板加载晚于任务写入也没关系，侧边栏 init 时的 catchUpTask 会主动读任务兜底。
  */
 async function askFromSelection(msg, sender) {
   const tab = sender && sender.tab;
   if (!tab || tab.id == null) return { ok: false, error: 'No active tab' };
 
-  let opened = true;
-  try {
-    await chrome.sidePanel.open({ tabId: tab.id });
-  } catch {
-    opened = false;
-  }
+  const opened = true; // open 已在同步分支尝试过；同步调用拿不到可靠结果
 
   const text = String(msg.text || '').trim();
   if (!text) return { ok: false, error: 'Empty selection' };
@@ -313,7 +319,35 @@ async function askFromSelection(msg, sender) {
   // 顺手刷新页面上下文，便于紧接着的自由追问
   capturePageContext(tab).catch(() => {});
 
+  /*
+   * 兜底：sidePanel.open() 即使同步调用也可能被 Chrome 静默拒绝（手势链被拉长、
+   * 扩展刚重载等）。这时任务已经落盘，但用户眼前一片安静，最难排查。
+   * 所以在这里等一下**回执**：面板真的接住任务会写 ACK，1.5s 内没收到就明确引导用户。
+   */
+  schedulePanelFallback(tab.id, task.taskId);
+
   return { ok: true, opened };
+}
+
+/**
+ * 面板兜底提示：任务写入后若始终没有回执，说明面板多半没打开，
+ * 回推一条提示给 content script，让用户知道该点工具栏图标。
+ */
+function schedulePanelFallback(tabId, taskId) {
+  setTimeout(async () => {
+    try {
+      const data = await chrome.storage.session.get(ACK_KEY);
+      if (data[ACK_KEY] === taskId) return; // 面板已接住任务，一切正常
+    } catch {
+      return;
+    }
+    chrome.tabs
+      .sendMessage(tabId, {
+        type: 'wb-toast',
+        text: 'Side panel did not open — click the webbuddy toolbar icon to see the answer.'
+      })
+      .catch(() => {}); // 页面已关闭或脚本未注入则忽略
+  }, 1500);
 }
 
 /**

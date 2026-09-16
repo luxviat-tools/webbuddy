@@ -88,7 +88,8 @@ async function catchUpTask() {
 
 async function handleTask(task) {
   processedTaskId = task.taskId;
-  chrome.storage.session.set({ [MARKER_KEY]: task.taskId });
+  // 回执：后台靠它判断「面板真的起来并接住了任务」，没收到才会提示用户手动打开
+  chrome.storage.session.set({ [MARKER_KEY]: task.taskId, [ACK_KEY]: task.taskId });
 
   // 新任务打断进行中的流式输出
   if (abortCtl) {

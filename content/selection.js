@@ -138,6 +138,14 @@
     });
   } catch {}
 
+  // 后台发现「面板没起来」时回推的提示（兜底，避免点了之后完全没反馈）
+  try {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (msg && msg.type === 'wb-toast' && msg.text) toast(msg.text);
+      return false;
+    });
+  } catch {}
+
   /* ================= UI 构建（首次用到才建） ================= */
 
   function buildUI() {
@@ -396,25 +404,38 @@
 
   async function ask(opts) {
     const text = selectedText;
-    hideAll();
-    let res = null;
+    /*
+     * 【手势优先】runtime.sendMessage 必须在点击的同步执行栈里第一时间发出。
+     * 用户手势标记存活极短，它要跨「页面 → 后台」这一跳，中途任何拖沓都会让后台的
+     * sidePanel.open() 被 Chrome 静默忽略。所以先发消息，收 UI 排在后面。
+     */
+    let pending = null;
     try {
-      res = await chrome.runtime.sendMessage({
+      pending = chrome.runtime.sendMessage({
         type: 'ask-selection',
         text,
         promptId: opts.promptId || '',
         custom: !!opts.custom
       });
     } catch {
+      pending = null;
+    }
+    hideAll();
+
+    let res = null;
+    if (pending) {
+      try {
+        res = await pending;
+      } catch {
+        pending = null;
+      }
+    }
+    if (!pending) {
       toast('webbuddy was reloaded — refresh the page and try again.');
       return;
     }
     if (!res || res.ok !== true) {
       toast((res && res.error) || "Couldn't reach webbuddy.");
-      return;
-    }
-    if (res.opened === false) {
-      toast('Side panel was blocked — click the webbuddy toolbar icon to open it.');
     }
   }
 
