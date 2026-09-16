@@ -1,0 +1,94 @@
+/* 学习助手 · 图片控制 + 免广告规则（由 content.js 给 <html> 加 class 触发） */
+
+/* ============ 图片控制 ============ */
+
+/* 隐藏模式核心：媒体本身不渲染（不加载、不显示），但只在「纯图片容器」上才折叠占位框。
+ * 这样无图模式只去掉图片，含正文的卡片（知乎 feed 等）文字照常显示，不会塌成空白。 */
+html.la-img-hidden img,
+html.la-img-hidden picture,
+html.la-img-hidden video,
+html.la-img-hidden canvas {
+  display: none !important;
+}
+
+/* Quora 专用：图片包裹层直接隐藏 */
+html.la-img-hidden [class*="qtext_image"] {
+  display: none !important;
+}
+
+/* 仅折叠「纯图片容器」：由 content.js 判定（隐藏图片后容器内已无文字/其他内容）
+ * 才会打上此标记；含正文的卡片不会被折叠，从根本上避免误伤整页/整卡内容。 */
+html.la-img-hidden .la-img-container-hidden {
+  aspect-ratio: auto !important;
+  height: auto !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  padding-top: 0 !important;
+  padding-bottom: 0 !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+html.la-img-hidden iframe[src*="youtube.com"],
+html.la-img-hidden iframe[src*="youtu.be"],
+html.la-img-hidden iframe[src*="vimeo.com"],
+html.la-img-hidden iframe[src*="bilibili.com"],
+html.la-img-hidden iframe[src*="player.bilibili.com"],
+html.la-img-hidden iframe[src*="douyin.com"],
+html.la-img-hidden iframe[src*="player."] {
+  display: none !important;
+}
+
+/* 内联背景图（div style="background-image:..."）——覆盖 Quora 等用背景图展示照片的情况 */
+html.la-img-hidden [style*="background-image"] {
+  background-image: none !important;
+}
+
+/* 缩略模式：图片缩小到 48px 见轮廓，视频缩小到 96px */
+html.la-img-thumb img,
+html.la-img-thumb canvas[data-src] {
+  max-width: 48px !important;
+  max-height: 48px !important;
+  width: auto !important;
+  height: auto !important;
+}
+
+html.la-img-thumb video {
+  max-width: 96px !important;
+  max-height: 96px !important;
+}
+
+/* ============ 免广告（CSS 隐藏） ============ */
+
+/* 精确的完整类名 / 前缀 / 明确词，避免 [class*="ad"] 误伤 load/download/gradient 等 */
+html.la-adblock .ad,
+html.la-adblock .ads,
+html.la-adblock .advert,
+html.la-adblock .advertisement,
+html.la-adblock .sponsored,
+html.la-adblock .adsbygoogle,
+html.la-adblock ins.adsbygoogle,
+html.la-adblock [class^="ad-"],
+html.la-adblock [class^="ad_"],
+html.la-adblock [class^="ads-"],
+html.la-adblock [class^="ads_"],
+html.la-adblock [id^="ad-"],
+html.la-adblock [id^="ad_"],
+html.la-adblock [id^="ads-"],
+html.la-adblock [id^="ads_"],
+html.la-adblock [class*="advertisement"],
+html.la-adblock [class*="advert"],
+html.la-adblock [class*="sponsored"],
+html.la-adblock [class*="adsbygoogle"],
+html.la-adblock [class*="ad-banner"],
+html.la-adblock [class*="ad-container"],
+html.la-adblock [class*="ad-wrapper"],
+html.la-adblock [class*="ad-slot"],
+html.la-adblock [id*="google_ads"],
+html.la-adblock [id*="google-ads"],
+html.la-adblock [id*="adsense"],
+html.la-adblock [id*="advert"],
+html.la-adblock iframe[id*="google_ads"],
+html.la-adblock iframe[id*="adsense"] {
+  display: none !important;
+}

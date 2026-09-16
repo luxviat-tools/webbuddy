@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OneTab · 学习助手</title>
+<link rel="stylesheet" href="onetab.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect x="3" y="4" width="13" height="16" rx="2"></rect>
+      <path d="M8 4h10a2 2 0 0 1 2 2v12"></path>
+    </svg>
+    <span>OneTab</span>
+    <span class="sub">学习助手内置</span>
+  </div>
+  <div class="search">
+    <input id="q" type="search" placeholder="搜索分组名、备注、标题或网址…" autocomplete="off">
+  </div>
+  <div class="top-actions">
+    <button id="btn-io" class="top-btn">导入 &amp; 导出</button>
+    <button id="btn-options" class="top-btn">设置</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <aside class="rail">
+    <label class="named-only"><input type="checkbox" id="named-only"> 仅显示命名项</label>
+    <div class="rail-tag">收藏夹</div>
+    <nav id="rail"></nav>
+  </aside>
+
+  <main class="content">
+    <div class="content-head">
+      <div class="title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 7a2 2 0 0 1 2-2h3.6l1.7 2H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+        </svg>
+        <span id="ch-name">全部</span>
+        <span id="ch-count" class="count">0</span>
+      </div>
+      <div class="right">
+        <button id="btn-collect-all" class="collect-all" title="把所有窗口的网页标签收进这里，并关闭它们以释放内存">收入全部窗口</button>
+        <button id="btn-view-more" class="icon-act" title="更多操作">⋮</button>
+      </div>
+    </div>
+
+    <div id="cards" class="cards"></div>
+
+    <div id="empty" class="empty" hidden>
+      <h2>这里还没有内容</h2>
+      <p>点右上角「收入全部窗口」，或在你正在浏览的网页上右键 → 🗂 OneTab → 收入当前 / 所有标签。</p>
+      <p>一次收纳会生成一张卡片；卡片里的每个链接都能拖到别的卡片里重新归类。</p>
+    </div>
+  </main>
+</div>
+
+<div id="menu" class="menu" hidden></div>
+<div id="toast" class="toast" hidden></div>
+<input type="file" id="file" accept=".json,.txt,text/plain" hidden>
+
+<script src="onetab-store.js"></script>
+<script src="onetab-page.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+# 项目级工作数据（AI 记忆/日志，不入库）
+.workbuddy/
+
+# 编辑器与系统
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# 打包产物
+*.zip
+*.crx
+dist/
