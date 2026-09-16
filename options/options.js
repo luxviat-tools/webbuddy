@@ -315,13 +315,15 @@ function fillUI() {
   $('ui-scope').value = settings.ui.sidebarScope || 'global';
   $('ui-keep').checked = !!settings.ui.keepHistory;
   $('ui-max').value = settings.ui.maxHistory || 50;
+  $('ui-bubble').checked = settings.ui.selectionBubble !== false;
 }
 
 function currentUI() {
   return {
     sidebarScope: 'global', // v1 固定全局共享
     keepHistory: $('ui-keep').checked,
-    maxHistory: Math.min(500, Math.max(1, parseInt($('ui-max').value, 10) || 50))
+    maxHistory: Math.min(500, Math.max(1, parseInt($('ui-max').value, 10) || 50)),
+    selectionBubble: $('ui-bubble').checked
   };
 }
 
@@ -391,5 +393,6 @@ function bindEvents() {
 
   $('ui-keep').addEventListener('change', saveUINow);
   $('ui-max').addEventListener('change', saveUINow);
+  $('ui-bubble').addEventListener('change', saveUINow);
   $('ad-block').addEventListener('change', saveAdBlock);
 }

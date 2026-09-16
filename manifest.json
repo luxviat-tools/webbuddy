@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "webbuddy",
-  "version": "1.4.1",
-  "description": "A browsing assistant in your sidebar: ask about selected text, explain the current page, hide or shrink images and video, block ads, and dock tabs with the built-in Tab Dock manager (100% local). Works with any OpenAI-compatible API (DeepSeek / Moonshot / Qwen / Ollama…).",
+  "version": "1.5.0",
+  "description": "A browsing assistant in your sidebar: select text and a webbuddy icon pops up to ask AI about it, explain the current page, hide or shrink images and video, block ads, and dock tabs with the built-in Tab Dock manager (100% local). Works with any OpenAI-compatible API (DeepSeek / Moonshot / Qwen / Ollama…).",
   "minimum_chrome_version": "116",
   "permissions": ["contextMenus", "sidePanel", "storage", "activeTab", "scripting", "tabs"],
   "host_permissions": ["<all_urls>"],
@@ -10,7 +10,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content/content.js"],
+      "js": ["content/content.js", "content/selection.js"],
       "css": ["content/content.css"],
       "run_at": "document_start",
       "all_frames": true,

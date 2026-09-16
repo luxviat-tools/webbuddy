@@ -255,8 +255,66 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       .catch(() => sendResponse({}));
     return true; // 异步响应
   }
+  // 划词气泡点了预设问题：开面板 + 派发任务（与右键菜单同一条链路）
+  if (msg && msg.type === 'ask-selection') {
+    askFromSelection(msg, sender)
+      .then((r) => sendResponse(r))
+      .catch((e) => sendResponse({ ok: false, error: String((e && e.message) || e) }));
+    return true; // 异步响应
+  }
+  // 气泡里的 Settings
+  if (msg && msg.type === 'open-options') {
+    chrome.runtime.openOptionsPage().catch(() => {});
+    return false;
+  }
   return false;
 });
+
+/*
+ * 划词气泡入口：content script 点预设问题 → 这里负责开侧边栏并写任务。
+ * open() 必须在用户手势有效期内【同步】调用，所以放在最前面（同右键菜单路径）。
+ * 手势从 content script 的 click 经 runtime 消息传过来，正常情况下能开；
+ * 万一被拦，任务已写好，用户手动点工具栏图标后面板 init 的 catchUpTask 也会补上。
+ */
+async function askFromSelection(msg, sender) {
+  const tab = sender && sender.tab;
+  if (!tab || tab.id == null) return { ok: false, error: 'No active tab' };
+
+  let opened = true;
+  try {
+    await chrome.sidePanel.open({ tabId: tab.id });
+  } catch {
+    opened = false;
+  }
+
+  const text = String(msg.text || '').trim();
+  if (!text) return { ok: false, error: 'Empty selection' };
+
+  const settings = await getMergedSettings();
+  const vars = { text, title: tab.title || '', url: tab.url || '' };
+
+  let task = null;
+  if (msg.custom) {
+    task = { type: 'custom', label: 'Custom question', vars };
+  } else {
+    const prompt = settings.prompts.find((p) => p.id === msg.promptId);
+    // 与右键菜单同一套过滤条件：禁用的预设不能从任何入口触发
+    if (!prompt || !prompt.enabled || !prompt.label || !prompt.template) {
+      return { ok: false, error: 'Unknown preset question' };
+    }
+    task = { type: 'preset', label: prompt.label, template: prompt.template, vars };
+  }
+
+  task.taskId = crypto.randomUUID();
+  task.tabId = tab.id;
+  task.createdAt = Date.now();
+  await chrome.storage.session.set({ [TASK_KEY]: task });
+
+  // 顺手刷新页面上下文，便于紧接着的自由追问
+  capturePageContext(tab).catch(() => {});
+
+  return { ok: true, opened };
+}
 
 /**
  * 注入的框选脚本：覆盖遮罩，用户拖拽框选，Esc 取消。

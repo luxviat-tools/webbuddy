@@ -78,7 +78,9 @@ const DEFAULT_SETTINGS = {
   ui: {
     sidebarScope: 'global',
     keepHistory: false,
-    maxHistory: 50
+    maxHistory: 50,
+    // 划词气泡：选中文字后自动浮出图标（content/selection.js 消费），默认开
+    selectionBubble: true
   }
 };
 
