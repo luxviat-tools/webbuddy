@@ -60,35 +60,63 @@ html.la-img-thumb video {
 
 /* ============ 免广告（CSS 隐藏） ============ */
 
-/* 精确的完整类名 / 前缀 / 明确词，避免 [class*="ad"] 误伤 load/download/gradient 等 */
-html.la-adblock .ad,
-html.la-adblock .ads,
-html.la-adblock .advert,
-html.la-adblock .advertisement,
-html.la-adblock .sponsored,
-html.la-adblock .adsbygoogle,
-html.la-adblock ins.adsbygoogle,
-html.la-adblock [class^="ad-"],
-html.la-adblock [class^="ad_"],
-html.la-adblock [class^="ads-"],
-html.la-adblock [class^="ads_"],
-html.la-adblock [id^="ad-"],
-html.la-adblock [id^="ad_"],
-html.la-adblock [id^="ads-"],
-html.la-adblock [id^="ads_"],
-html.la-adblock [class*="advertisement"],
-html.la-adblock [class*="advert"],
-html.la-adblock [class*="sponsored"],
-html.la-adblock [class*="adsbygoogle"],
-html.la-adblock [class*="ad-banner"],
-html.la-adblock [class*="ad-container"],
-html.la-adblock [class*="ad-wrapper"],
-html.la-adblock [class*="ad-slot"],
-html.la-adblock [id*="google_ads"],
-html.la-adblock [id*="google-ads"],
-html.la-adblock [id*="adsense"],
-html.la-adblock [id*="advert"],
-html.la-adblock iframe[id*="google_ads"],
-html.la-adblock iframe[id*="adsense"] {
+/*
+ * 原则：宁可漏拦，也绝不能误伤正常内容。
+ *
+ * 踩过的坑：[class*="ad-wrapper"] 命中百度首页的
+ *   class="head_wrapper s-isindex-wrap nologin search-box-new-head-wrapper"
+ * 因为 "head-wrapper" 里天然含 "ad-wrapper"，整个搜索框头部被 display:none，首页直接残缺。
+ * 同理 head-/load-/read-/thread-/brand-/board- 这些以 d 结尾的词，
+ * 拼上 -banner / -container / -wrapper / -slot 都会误判成广告。
+ *
+ * 因此 ad-* 复合词一律改用「带边界」的写法：
+ *   1) [class^="ad-"]      类名以 ad- 开头（属性的第一个词）
+ *   2) [class*=" ad-"]     前面必须有空格 —— 即独立的一个类名，而非别的词的尾部碎片
+ * 末再用 :not(:is(...)) 兜底：结构性 / 交互性元素永不隐藏。
+ */
+html.la-adblock :is(
+  .ad,
+  .ads,
+  .advert,
+  .advertisement,
+  .sponsored,
+  .adsbygoogle,
+  ins.adsbygoogle,
+  [class^="ad-"],
+  [class^="ad_"],
+  [class^="ads-"],
+  [class^="ads_"],
+  [class*=" ad-"],
+  [class*=" ad_"],
+  [class*=" ads-"],
+  [class*=" ads_"],
+  [class*="advertisement"],
+  [class*="advert"],
+  [class*="sponsored"],
+  [class*="adsbygoogle"],
+  [id^="ad-"],
+  [id^="ad_"],
+  [id^="ads-"],
+  [id^="ads_"],
+  [id*="google_ads"],
+  [id*="google-ads"],
+  [id*="adsense"],
+  [id*="advert"],
+  iframe[id*="google_ads"],
+  iframe[id*="adsense"]
+):not(
+  :is(
+    form,
+    fieldset,
+    input,
+    textarea,
+    select,
+    nav,
+    main,
+    [role="search"],
+    [role="main"],
+    [role="navigation"]
+  )
+) {
   display: none !important;
 }

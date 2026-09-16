@@ -1,81 +1,82 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-page-node-id="Gf6TJFR5IdOxhMVteq0KOY">
-<head data-page-node-id="y6T5C1zRfjdCZAZnd03jNE">
-<meta charset="utf-8" data-page-node-id="lY2Y6UzJwRF5FSD265OIv8">
-<meta name="viewport" content="width=device-width, initial-scale=1" data-page-node-id="Jch7gF40J1FkBc8hXR78ry">
-<title>学习助手</title>
-<link rel="stylesheet" href="../libs/github.min.css" data-page-node-id="m8XiVcE41zauFBRrqli6s3">
-<link rel="stylesheet" href="sidepanel.css" data-page-node-id="zDAqLxwRWEJPT0xCBgCMOy">
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>webbuddy</title>
+<link rel="stylesheet" href="../libs/github.min.css">
+<link rel="stylesheet" href="sidepanel.css">
 </head>
-<body data-page-node-id="b7yypiACU1ahciT1a0a2I8">
+<body>
 
-<header id="topbar" data-page-node-id="DMQuUA3WA5lzOPzu9azyke">
-  <select id="model-select" class="model-select" title="切换模型" data-page-node-id="fi85QXFJYuJhLXYmJVP2hW"></select>
-  <div class="spacer" data-page-node-id="MaHEZqxbl2ZcCEgCQaaA3m"></div>
-  <button id="btn-onetab" class="ot-btn" title="OneTab：收纳与管理标签页" aria-label="OneTab" data-page-node-id="R3KxGjVUXjhXYiwZ4DXKLP">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-page-node-id="C9aq6DfyI1WH5jhouic6Df">
-      <rect x="3" y="4" width="13" height="16" rx="2" data-page-node-id="NKM4EXezoRKw56DNXiYQJN"></rect>
-      <path d="M8 4h10a2 2 0 0 1 2 2v12" data-page-node-id="qiyFLZYzmRmnkhOSTwCtgv"></path>
+<header id="topbar">
+  <select id="model-select" class="model-select" title="Switch model"></select>
+  <div class="spacer"></div>
+  <button id="btn-tabdock" class="td-btn" title="Tab Dock — dock and manage tabs" aria-label="Tab Dock">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <rect x="3" y="4" width="13" height="16" rx="2"></rect>
+      <path d="M8 4h10a2 2 0 0 1 2 2v12"></path>
     </svg>
   </button>
-  <button id="btn-ad" class="ad-btn" title="免广告开关" aria-label="免广告开关" data-page-node-id="CnDv4RUK1AYmtFRehvdTy6">Ad</button>
-  <button id="btn-img" class="img-toggle" title="图片显示" aria-label="图片显示模式" data-page-node-id="xKxFgzGDRhyV40Zp9JV8BT"></button>
-  <button id="btn-new" class="icon-btn" title="新会话（清空当前时间线）" data-page-node-id="x1HoQIonfA5bBgavWniDVH">＋</button>
-  <button id="btn-settings" class="icon-btn" title="设置" data-page-node-id="f6d2kTKATNrBaZye3e6GTE">⚙</button>
+  <button id="btn-ad" class="ad-btn" title="Ad block" aria-label="Ad block">Ad</button>
+  <button id="btn-img" class="img-toggle" title="Image display" aria-label="Image display mode"></button>
+  <button id="btn-new" class="icon-btn" title="New chat (clear the timeline)">＋</button>
+  <button id="btn-settings" class="icon-btn" title="Settings">⚙</button>
 </header>
 
-<main id="thread" data-page-node-id="LLWww4QxuYOvz1ReVJRYbH">
-  <div id="empty" class="empty" data-page-node-id="h6cGmJEiAQ8LOYDk9HSFSl">
-    <p class="empty-title" data-page-node-id="gBLPPC2waoJNPdglQsMOLp">选中网页文字，右键「问 AI」</p>
-    <p class="empty-sub" data-page-node-id="I9MtB8IlBJVdYCOQHBo98p">或直接在下方输入框提问，答案会在这里流式呈现。</p>
-    <button id="btn-go-settings" class="link-btn" hidden data-page-node-id="uAnnQvgcVIzq1s0B3MlruO">首次使用请先配置 API →</button>
+<main id="thread">
+  <div id="empty" class="empty">
+    <p class="empty-title">Select text on a page, then right-click → Ask AI</p>
+    <p class="empty-sub">Or ask in the box below — answers stream in here.</p>
+    <button id="btn-go-settings" class="link-btn" hidden>Set up your API first →</button>
   </div>
 </main>
 
-<section id="onetab-view" hidden data-page-node-id="DkimVT6AqWr9qFAZUX86VK">
-  <div class="ot-toolbar" data-page-node-id="99aZOs39peapEOW7eDPF4L">
-    <button id="ot-collect" class="ot-act primary" title="把当前窗口所有网页标签收进来，并关闭它们以释放内存" data-page-node-id="5jkHG8n50NyXvBW8vUFXVO">收入当前窗口</button>
-    <span class="ot-spacer" data-page-node-id="9npauXdjSFA3L1xMJZpEDL"></span>
-    <button id="ot-open-page" class="ot-act link" title="在新标签页打开完整管理页：分类、回收站、拖动归类、更多菜单" data-page-node-id="WXRcKI0WobFq96AKcC8OqO">管理页 ↗</button>
-    <button id="ot-import" class="ot-act link" title="导入：支持本工具 JSON 或 OneTab 导出的纯文本" data-page-node-id="ABxcMLdkHrM1hyJF1Mbov3">导入</button>
-    <button id="ot-export" class="ot-act link" title="导出为文本文件（与 OneTab 兼容）" data-page-node-id="RIjnbSYDdWjigtkHAHuKy9">导出</button>
+<section id="tabdock-view" hidden>
+  <div class="td-toolbar">
+    <button id="td-collect" class="td-act primary" title="Dock every tab in this window, then close them to free memory">Dock window</button>
+    <span class="td-spacer"></span>
+    <button id="td-expand-all" class="td-act link" title="Expand every group at once (click again to collapse all)">Expand all</button>
+    <button id="td-open-page" class="td-act link" title="Open the full manager in a new tab: folders, trash, drag & drop, more menus">Manager ↗</button>
+    <button id="td-import" class="td-act link" title="Import: JSON backup or plain text">Import</button>
+    <button id="td-export" class="td-act link" title="Export as plain text">Export</button>
   </div>
-  <div id="ot-status" class="ot-status" hidden data-page-node-id="oippBkHHiycC1rbGzKTeuH"></div>
-  <div id="ot-list" class="ot-list" data-page-node-id="kh2TUIXhbX8Jxo5aRGKPd5"></div>
-  <div id="ot-empty" class="ot-empty" data-page-node-id="QcDUuggLsGdgG0QgvHibnX">暂无保存的标签。<br data-page-node-id="uETQON9gFqP2SlyQ8fhAHC">点上方「收入当前窗口」把打开的网页收进来；<br data-page-node-id="od0xrc4aCGpNDZ9euGwtZI">或右键页面 → 🗂 OneTab → 收入当前 / 所有标签。</div>
-  <input type="file" id="ot-file" accept=".json,.txt,text/plain" hidden data-page-node-id="pDa2U9ybqBOxf5amU7l52G">
+  <div id="td-status" class="td-status" hidden></div>
+  <div id="td-list" class="td-list"></div>
+  <div id="td-empty" class="td-empty">No docked tabs yet.<br>Hit “Dock window” above to stash your open pages;<br>or right-click a page → 🗂 Tab Dock → Dock current / all tabs.</div>
+  <input type="file" id="td-file" accept=".json,.txt,text/plain" hidden>
 </section>
 
-<nav id="nav-dots" class="nav-dots" hidden data-page-node-id="ZACd15tmRE3DI53V6mns09">
-  <button id="nav-top" class="nav-arrow" title="回到顶部" data-page-node-id="WN20BPkkeXpdDOPRENg7yx">↑</button>
-  <div id="nav-list" class="nav-list" data-page-node-id="h6nOJTdnLeeD4CGffsm2md"></div>
-  <button id="nav-bottom" class="nav-arrow" title="回到底部" data-page-node-id="MiBqFXKNPgj8FJUV3u6Gf6">↓</button>
+<nav id="nav-dots" class="nav-dots" hidden>
+  <button id="nav-top" class="nav-arrow" title="Back to top">↑</button>
+  <div id="nav-list" class="nav-list"></div>
+  <button id="nav-bottom" class="nav-arrow" title="Back to bottom">↓</button>
 </nav>
 
-<footer id="footer-bar" data-page-node-id="tVjM4iYFk0x5Led5Gf3GYR">
-  <div id="ctx-chip" class="ctx-chip" hidden data-page-node-id="TbNfOxiEY75Y6M9xNokY0X">
-    <span id="ctx-chip-text" data-page-node-id="zkKEasrFq2wL08md9sEKLh"></span>
-    <button id="ctx-chip-close" title="移除引用" data-page-node-id="JaDI4ef0WXYFsKFU47fCTu">✕</button>
+<footer id="footer-bar">
+  <div id="ctx-chip" class="ctx-chip" hidden>
+    <span id="ctx-chip-text"></span>
+    <button id="ctx-chip-close" title="Remove reference">✕</button>
   </div>
-  <div id="status-bar" class="status-bar" hidden data-page-node-id="7IBmd2nkHaWbQ4jCvJs9DG"></div>
-  <div id="shot-preview" class="shot-preview" hidden data-page-node-id="ebCHwsrO22QIUwlMXzDEfh">
-    <img id="shot-img" alt="截图预览" data-page-node-id="SPgBjqpln9HcCtL67VLz3d">
-    <div class="shot-prompts" id="shot-prompts" data-page-node-id="zAYjgXUFUCQFXndfzdpW4O"></div>
-    <div class="shot-foot" data-page-node-id="LbwZNchGeYxrGl9Tvlq48I">
-      <span class="shot-hint" data-page-node-id="rS5sqxNug3BrKX6xPQoNCr">可点上方问题，或输入追问后发送</span>
-      <button id="shot-cancel" class="shot-cancel" type="button" data-page-node-id="ECrwBSy7LHTDDLBu5myUFW">✕ 取消</button>
+  <div id="status-bar" class="status-bar" hidden></div>
+  <div id="shot-preview" class="shot-preview" hidden>
+    <img id="shot-img" alt="Screenshot preview">
+    <div class="shot-prompts" id="shot-prompts"></div>
+    <div class="shot-foot">
+      <span class="shot-hint">Pick a question above, or type a follow-up and send</span>
+      <button id="shot-cancel" class="shot-cancel" type="button">✕ Cancel</button>
     </div>
   </div>
-  <div class="input-row" data-page-node-id="Z8JOj3pfcBFOfQRmEAtIC9">
-    <button id="btn-shot" class="shot-btn" title="截图提问" aria-label="截图提问" data-page-node-id="VDn243dm4L9PAOs19hHOzd">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" data-page-node-id="0qGaVCyCc66a3VLBignDrK">
-        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" data-page-node-id="NxHc17DOs2VZfYxkN6g5xV"></path>
-        <circle cx="12" cy="13" r="4" data-page-node-id="1tdaXQUtVowUdxY8BiEC6u"></circle>
+  <div class="input-row">
+    <button id="btn-shot" class="shot-btn" title="Screenshot question" aria-label="Screenshot question">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+        <circle cx="12" cy="13" r="4"></circle>
       </svg>
     </button>
-    <textarea id="input" rows="1" placeholder="追问…（Enter 发送，Shift+Enter 换行）"></textarea>
-    <button id="btn-send" class="send-btn" title="发送" disabled data-page-node-id="843j8HLCzYgYZ4q1aPl4TH">➤</button>
-    <button id="btn-stop" class="stop-btn" title="停止生成" hidden data-page-node-id="bjF5lt0v7I4kUd6WEFDy66">■</button>
+    <textarea id="input" rows="1" placeholder="Ask a follow-up… (Enter to send, Shift+Enter for newline)"></textarea>
+    <button id="btn-send" class="send-btn" title="Send" disabled>➤</button>
+    <button id="btn-stop" class="stop-btn" title="Stop generating" hidden>■</button>
   </div>
 </footer>
 
@@ -83,8 +84,8 @@
 <script src="../libs/purify.min.js"></script>
 <script src="../libs/highlight.min.js"></script>
 <script src="../common.js"></script>
-<script src="../onetab-store.js"></script>
+<script src="../tabdock-store.js"></script>
 <script src="sidepanel.js"></script>
-<script src="onetab.js"></script>
+<script src="tabdock.js"></script>
 </body>
 </html>

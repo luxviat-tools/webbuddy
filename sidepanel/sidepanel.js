@@ -53,7 +53,7 @@ let autoScroll = true;      // 用户手动上滚则暂停跟随
 
 marked.use({ breaks: true, gfm: true });
 
-init().catch((err) => console.error('[学习助手] 初始化失败:', err));
+init().catch((err) => console.error('[webbuddy] 初始化失败:', err));
 
 async function init() {
   settings = await getMergedSettings();
@@ -229,14 +229,14 @@ async function runCompletion() {
 
   if (!settings.api.baseURL || !settings.api.model) {
     const el = appendMessage('assistant', '');
-    renderError(el, '尚未配置 API：请先到设置页填写 baseURL / apiKey / model。', true);
+    renderError(el, 'API not configured: add baseURL / apiKey / model in Settings.', true);
     return;
   }
 
   const el = appendMessage('assistant', '');
   const body = el.querySelector('.body');
   el.classList.add('streaming');
-  setStatus('思考中…');
+  setStatus('Thinking…');
 
   const myCtl = new AbortController();
   abortCtl = myCtl;
@@ -279,7 +279,7 @@ async function runCompletion() {
       onDelta: (delta) => {
         assistant.content += delta;
         scheduleRender();
-        setStatus('生成中… ' + assistant.content.length + ' 字');
+        setStatus('Generating… ' + assistant.content.length + ' chars');
       }
     });
     finishMessage(el, assistant, 'done');
@@ -339,7 +339,7 @@ function finishMessage(el, assistant, state) {
     return;
   }
 
-  renderMarkdown(body, assistant.content || '（空响应）');
+  renderMarkdown(body, assistant.content || '(empty response)');
   highlightIn(el);
 
   const footer = document.createElement('div');
@@ -348,7 +348,7 @@ function finishMessage(el, assistant, state) {
   if (state === 'stopped') {
     const tag = document.createElement('span');
     tag.className = 'tag';
-    tag.textContent = '已停止';
+    tag.textContent = 'Stopped';
     footer.appendChild(tag);
   }
   el.appendChild(footer);
@@ -362,7 +362,7 @@ function renderError(el, message, withSettingsBtn) {
   const p = document.createElement('p');
   p.textContent = '⚠ ' + message;
   const retry = document.createElement('button');
-  retry.textContent = '重试';
+  retry.textContent = 'Retry';
   retry.addEventListener('click', async () => {
     el.remove();
     await runCompletion();
@@ -371,7 +371,7 @@ function renderError(el, message, withSettingsBtn) {
   box.appendChild(retry);
   if (withSettingsBtn) {
     const cfg = document.createElement('button');
-    cfg.textContent = '打开设置';
+    cfg.textContent = 'Open settings';
     cfg.addEventListener('click', () => chrome.runtime.openOptionsPage());
     box.appendChild(cfg);
   }
@@ -388,7 +388,7 @@ function appendMessage(role, content, image) {
     const img = document.createElement('img');
     img.className = 'msg-img';
     img.src = image;
-    img.alt = '截图';
+    img.alt = 'Screenshot';
     wrap.appendChild(img);
   }
   const body = document.createElement('div');
@@ -408,7 +408,7 @@ function renderThread() {
       appendMessage('user', m.content, m.image);
     } else if (m.role === 'assistant') {
       const el = appendMessage('assistant', '');
-      renderMarkdown(el.querySelector('.body'), m.content || '（空响应）');
+      renderMarkdown(el.querySelector('.body'), m.content || '(empty response)');
       highlightIn(el);
       const footer = document.createElement('div');
       footer.className = 'msg-footer';
@@ -446,7 +446,7 @@ function renderNavDots() {
     const text = body ? body.textContent.trim() : '';
     const dot = document.createElement('button');
     dot.className = 'nav-dot';
-    dot.dataset.tip = truncateText(text, 100) || '问题 ' + (i + 1);
+    dot.dataset.tip = truncateText(text, 100) || 'Question ' + (i + 1);
     dot.addEventListener('click', () => scrollToMessage(i));
     dot.addEventListener('mouseenter', () => showNavTip(dot));
     dot.addEventListener('mouseleave', hideNavTip);
@@ -512,13 +512,13 @@ function highlightIn(el) {
     if (pre.querySelector('.code-copy')) return;
     const btn = document.createElement('button');
     btn.className = 'code-copy';
-    btn.textContent = '复制';
+    btn.textContent = 'Copy';
     btn.addEventListener('click', async () => {
       const code = pre.querySelector('code');
       try {
         await navigator.clipboard.writeText(code ? code.innerText : pre.innerText);
-        btn.textContent = '已复制';
-        setTimeout(() => (btn.textContent = '复制'), 1500);
+        btn.textContent = 'Copied';
+        setTimeout(() => (btn.textContent = 'Copy'), 1500);
       } catch {}
     });
     pre.appendChild(btn);
@@ -527,12 +527,12 @@ function highlightIn(el) {
 
 function makeCopyButton(text) {
   const btn = document.createElement('button');
-  btn.textContent = '复制';
+  btn.textContent = 'Copy';
   btn.addEventListener('click', async () => {
     try {
       await navigator.clipboard.writeText(text);
-      btn.textContent = '已复制 ✓';
-      setTimeout(() => (btn.textContent = '复制'), 1500);
+      btn.textContent = 'Copied ✓';
+      setTimeout(() => (btn.textContent = 'Copy'), 1500);
     } catch {}
   });
   return btn;
@@ -566,7 +566,7 @@ async function loadPageCtx() {
 /* ================= 图片显示模式（单按钮循环切换） ================= */
 
 const IMG_ORDER = ['normal', 'thumb', 'hidden'];
-const IMG_LABELS = { normal: '正常', thumb: '缩略', hidden: '隐藏' };
+const IMG_LABELS = { normal: 'Normal', thumb: 'Thumbnail', hidden: 'Hidden' };
 const LANDSCAPE =
   '<circle cx="17" cy="5" r="2.5" fill="#F5A623"/><path d="M3 18 L8.5 10 L13 15.5 L17 11.5 L21 18 Z" fill="#6BA7E8"/><path d="M3 20.5 C6 19.5 9 21 12 20 C15 21 18 19.5 21 20.5" stroke="#7BB8E8" stroke-width="1.2" fill="none"/>';
 const IMG_ICONS = {
@@ -591,7 +591,7 @@ async function loadImgMode() {
 function renderImgSwitch() {
   const btn = els.imgBtn;
   btn.innerHTML = IMG_ICONS[imgMode] || IMG_ICONS.normal;
-  btn.title = '图片显示：' + (IMG_LABELS[imgMode] || imgMode) + '（点击切换）';
+  btn.title = 'Images: ' + (IMG_LABELS[imgMode] || imgMode) + ' (click to switch)';
 }
 
 async function setImgMode(mode) {
@@ -623,7 +623,7 @@ async function loadAdBlock() {
 
 function renderAdBtn() {
   els.adBtn.classList.toggle('on', adEnabled);
-  els.adBtn.title = adEnabled ? '免广告已开启（点击关闭）' : '免广告已关闭（点击开启）';
+  els.adBtn.title = adEnabled ? 'Ad block on (click to disable)' : 'Ad block off (click to enable)';
 }
 
 async function toggleAdBlock() {
@@ -704,7 +704,7 @@ function bindUI() {
 /* ================= 截图问图 ================= */
 
 async function startScreenshot() {
-  setStatus('请在页面上拖拽框选截图区域…');
+  setStatus('Drag on the page to select an area…');
   try {
     chrome.runtime.sendMessage({ type: 'start-screenshot' });
   } catch {
@@ -719,7 +719,7 @@ chrome.runtime.onMessage.addListener((msg) => {
       pendingImage = msg.dataUrl;
       showShotPreview(msg.dataUrl);
     } else if (msg.error) {
-      setStatus('截图失败：' + msg.error, 'error', true);
+      setStatus('Screenshot failed: ' + msg.error, 'error', true);
     }
   }
 });
@@ -796,7 +796,7 @@ function renderModelSelect() {
   if (!settings.api.baseURL) {
     sel.innerHTML = '';
     const opt = document.createElement('option');
-    opt.textContent = '未配置 API';
+    opt.textContent = 'API not configured';
     sel.appendChild(opt);
     sel.disabled = true;
     els.goSettings.hidden = false;
@@ -851,7 +851,7 @@ async function onModelChange() {
   if (!model || !settings.api.baseURL) return;
   settings.api.model = model;
   await saveSettings(settings);
-  setStatus('已切换模型：' + model);
+  setStatus('Model switched: ' + model);
   setTimeout(() => {
     if (!els.status.dataset.sticky) setStatusHidden();
   }, 1500);
@@ -887,7 +887,7 @@ function setStatusHidden() {
 }
 
 function showCtxChip(vars) {
-  els.ctxChipText.textContent = '引用选中文本：' + truncateText(vars.text || '', 60);
+  els.ctxChipText.textContent = 'Quoting selection: ' + truncateText(vars.text || '', 60);
   els.ctxChip.hidden = false;
 }
 

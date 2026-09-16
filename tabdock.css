@@ -311,7 +311,106 @@ button { font: inherit; color: inherit; }
 .t-row:hover .t-del { opacity: 1; }
 .t-del:hover { color: var(--danger); background: var(--danger-weak); }
 
+/* 单条网页的星标 / 更多：默认隐形，hover 或已星标时才浮现，避免每行都挂着按钮 */
+.t-star,
+.t-more {
+  border: none;
+  background: none;
+  color: var(--text-3);
+  cursor: pointer;
+  padding: 0 4px;
+  border-radius: 4px;
+  opacity: 0;
+  line-height: 1;
+  font-size: 13px;
+}
+.t-row:hover .t-star,
+.t-row:hover .t-more { opacity: 0.75; }
+.t-star:hover,
+.t-more:hover { opacity: 1; color: var(--accent); background: var(--accent-weak); }
+.t-star.on { opacity: 1; color: var(--warn); }
+.t-star.on:hover { color: var(--warn); background: var(--accent-weak); }
+
 .drop-line { height: 2px; background: var(--accent); border-radius: 2px; margin: 1px 0; }
+
+/* ---------- 移动到分组 对话框 ---------- */
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.modal-panel {
+  width: 420px;
+  max-width: 100%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.28);
+  padding: 16px;
+}
+.modal-panel h3 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--text);
+}
+.pick-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.pick-empty { color: var(--text-3); font-size: 12.5px; padding: 8px 2px; }
+.pick-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.pick-item:hover { border-color: var(--accent); background: var(--accent-weak); }
+.pick-count { flex: none; color: var(--text-3); font-size: 11.5px; }
+.pick-new { display: flex; gap: 8px; }
+.pick-new input {
+  flex: 1;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  padding: 8px 10px;
+  font-size: 13px;
+  outline: none;
+}
+.pick-new input:focus { border-color: var(--accent); }
+.pick-create {
+  flex: none;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
 
 /* ---------- 空状态 ---------- */
 .empty {

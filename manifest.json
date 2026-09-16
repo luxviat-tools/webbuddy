@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "学习助手",
-  "version": "1.3.0",
-  "description": "一站式浏览助手：选中文字右键提问、解读当前页面、图片/视频一键隐藏或缩略，并内置 OneTab 标签收纳管理页（完全本地）。支持 OpenAI 兼容 API（DeepSeek / Moonshot / 通义 / Ollama…）。",
+  "name": "webbuddy",
+  "version": "1.4.1",
+  "description": "A browsing assistant in your sidebar: ask about selected text, explain the current page, hide or shrink images and video, block ads, and dock tabs with the built-in Tab Dock manager (100% local). Works with any OpenAI-compatible API (DeepSeek / Moonshot / Qwen / Ollama…).",
   "minimum_chrome_version": "116",
   "permissions": ["contextMenus", "sidePanel", "storage", "activeTab", "scripting", "tabs"],
   "host_permissions": ["<all_urls>"],
@@ -20,7 +20,7 @@
   "side_panel": { "default_path": "sidepanel/index.html" },
   "options_page": "options/options.html",
   "action": {
-    "default_title": "学习助手",
+    "default_title": "webbuddy",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",

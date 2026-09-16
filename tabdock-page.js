@@ -1,8 +1,8 @@
 'use strict';
 
 /*
- * 学习助手 · OneTab 管理页
- * 1:1 复刻官方 OneTab 的布局与交互：
+ * webbuddy · Tab Dock 管理页
+ * Tab Dock 管理页：布局与交互参照同类标签收纳工具的通行做法，
  *  顶栏搜索 / 左栏分类计数 / 分组卡片（N tabs + 时间 + 折叠）/ 恢复全部 / ⋮ 更多菜单
  * 额外能力：标签链接可拖拽 —— 跨分组搬运、组内重排。
  */
@@ -25,7 +25,7 @@ const ui = {
   btnCollectAll: el('btn-collect-all')
 };
 
-let state = otEmptyState();
+let state = tdEmptyState();
 let folder = 'all';
 let query = '';
 let namedOnly = false;
@@ -63,7 +63,7 @@ function toast(text) {
 
 async function persist() {
   selfSaveAt = Date.now();
-  await otSaveState(state);
+  await tdSaveState(state);
   render();
 }
 
@@ -83,7 +83,7 @@ function hostOf(url) {
 
 function renderRail() {
   ui.rail.innerHTML = '';
-  ONETAB_FOLDERS.forEach((f, i) => {
+  TABDOCK_FOLDERS.forEach((f, i) => {
     if (i === 4) {
       const sep = document.createElement('div');
       sep.className = 'rail-sep';
@@ -93,7 +93,7 @@ function renderRail() {
     b.className = 'rail-item' + (folder === f.key ? ' on' : '');
     b.innerHTML = iconSvg(f.key) + '<span class="name"></span><span class="num"></span>';
     b.querySelector('.name').textContent = f.label;
-    b.querySelector('.num').textContent = String(otCountFor(state, f.key));
+    b.querySelector('.num').textContent = String(tdCountFor(state, f.key));
     b.addEventListener('click', () => {
       folder = f.key;
       render();
@@ -126,9 +126,11 @@ function buildFavicon(tab) {
 }
 
 function buildRow(group, tab) {
+  // 星标视图是虚拟卡片，tab 上的 __gid 才是它真正所属的分组
+  const gid = tab.__gid || group.id;
   const row = document.createElement('div');
   row.className = 't-row';
-  row.title = tab.title + '\n' + tab.url + '\n（点击打开；按住可拖到其它卡片）';
+  row.title = tab.title + '\n' + tab.url + '\nClick to open · drag to move it to another group';
   row.appendChild(buildFavicon(tab));
 
   const text = document.createElement('span');
@@ -141,28 +143,51 @@ function buildRow(group, tab) {
   host.textContent = hostOf(tab.url);
   row.appendChild(host);
 
+  const star = document.createElement('button');
+  star.className = 't-star' + (tab.star ? ' on' : '');
+  star.textContent = '★';
+  star.title = tab.star ? 'Unstar this page' : 'Star this page';
+  star.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    const next = !tab.star;
+    tdStarTab(state, gid, tab.url, next);
+    await persist();
+    toast(next ? 'Starred — find it under ⭐ Starred' : 'Star removed');
+  });
+  row.appendChild(star);
+
+  const more = document.createElement('button');
+  more.className = 't-more';
+  more.textContent = '⋮';
+  more.title = 'More actions';
+  more.addEventListener('click', (e) => {
+    e.stopPropagation(); // 否则会被 document 的「点外部关闭」立刻关掉
+    openMenu(e.currentTarget.getBoundingClientRect(), tabMenu(gid, tab));
+  });
+  row.appendChild(more);
+
   const del = document.createElement('button');
   del.className = 't-del';
   del.textContent = '✕';
-  del.title = '从本组移除（不打开）';
+  del.title = 'Remove from this group (without opening)';
   del.addEventListener('click', async (e) => {
     e.stopPropagation();
-    group.tabs = group.tabs.filter((t) => t.url !== tab.url);
-    if (!group.tabs.length) state.groups = state.groups.filter((g) => g.id !== group.id);
+    tdRemoveTab(state, gid, tab.url);
     await persist();
+    toast('Removed 1 page');
   });
   row.appendChild(del);
 
   row.addEventListener('click', async () => {
-    await otOpenOne(state, group.id, tab.url);
+    await tdOpenOne(state, gid, tab.url);
     await persist();
-    toast('已打开 1 个标签');
+    toast('Opened 1 tab');
   });
 
-  if (folder !== 'trash') {
+  if (folder !== 'trash' && !group.synthetic) {
     row.draggable = true;
     row.addEventListener('dragstart', (e) => {
-      dragSrc = { gid: group.id, url: tab.url };
+      dragSrc = { gid, url: tab.url };
       row.classList.add('dragging');
       try {
         e.dataTransfer.effectAllowed = 'move';
@@ -208,23 +233,6 @@ function showDropLine(list, y) {
   else list.appendChild(line);
 }
 
-function moveTab(srcGid, url, dstGid, index) {
-  const src = state.groups.find((g) => g.id === srcGid);
-  const dst = state.groups.find((g) => g.id === dstGid);
-  if (!src || !dst || folder === 'trash') return false;
-  const si = src.tabs.findIndex((t) => t.url === url);
-  if (si < 0) return false;
-  const [tab] = src.tabs.splice(si, 1);
-  if (src === dst) {
-    let idx = index > si ? index - 1 : index;
-    dst.tabs.splice(Math.max(0, Math.min(idx, dst.tabs.length)), 0, tab);
-  } else {
-    dst.tabs.splice(Math.max(0, Math.min(index, dst.tabs.length)), 0, tab);
-    if (!src.tabs.length) state.groups = state.groups.filter((g) => g.id !== srcGid);
-  }
-  return true;
-}
-
 function buildBadges(group) {
   const box = document.createElement('span');
   box.className = 'badges';
@@ -234,15 +242,16 @@ function buildBadges(group) {
     s.textContent = text;
     box.appendChild(s);
   };
-  if (group.pinned) add('置顶', 'pin');
+  if (group.pinned) add('Pinned', 'pin');
   if (group.star) add('★', 'star');
-  if (group.locked) add('锁定', 'lock');
-  if (group.pending) add('待办', '');
-  if (group.archived) add('归档', '');
+  if (group.locked) add('Locked', 'lock');
+  if (group.pending) add('Pending', '');
+  if (group.archived) add('Archived', '');
   return box;
 }
 
 function buildCard(group) {
+  const isSynth = !!group.synthetic; // 星标视图：虚拟卡片，不支持整组级操作
   const card = document.createElement('div');
   card.className = 'card';
   card.dataset.id = group.id;
@@ -253,14 +262,14 @@ function buildCard(group) {
   const left = document.createElement('div');
   const title = document.createElement('div');
   title.className = 'card-title';
-  title.textContent = otTitleOf(group);
+  title.textContent = tdTitleOf(group);
   title.appendChild(buildBadges(group));
   left.appendChild(title);
 
   if (String(group.name || '').trim()) {
     const sub = document.createElement('div');
     sub.className = 'card-sub';
-    sub.textContent = otCountLabel(group.tabs.length) + (group.locked ? ' · 已锁定，恢复后保留' : '');
+    sub.textContent = tdCountLabel(group.tabs.length) + (group.locked ? ' · locked, kept after restore' : '');
     left.appendChild(sub);
   }
   if (String(group.note || '').trim()) {
@@ -277,14 +286,14 @@ function buildCard(group) {
   const meta = document.createElement('div');
   meta.className = 'card-meta';
   const stamp = document.createElement('span');
-  stamp.textContent = otFormatStamp(group.ts);
+  stamp.textContent = tdFormatStamp(group.ts);
   const rel = document.createElement('span');
   rel.className = 'rel';
-  rel.textContent = '· ' + otRelative(group.ts);
+  rel.textContent = '· ' + tdRelative(group.ts);
   const chev = document.createElement('button');
   chev.className = 'chev';
   chev.textContent = group.collapsed ? '▼' : '▲';
-  chev.title = group.collapsed ? '展开' : '折叠';
+  chev.title = group.collapsed ? 'Expand' : 'Collapse';
   meta.append(stamp, rel, chev);
   right.appendChild(meta);
 
@@ -294,31 +303,37 @@ function buildCard(group) {
   if (folder === 'trash') {
     const back = document.createElement('button');
     back.className = 'link-act';
-    back.textContent = '↗ 恢复出来';
+    back.textContent = '↗ Restore';
     back.addEventListener('click', async () => {
-      otRestoreFromTrash(state, group.id);
+      tdRestoreFromTrash(state, group.id);
       await persist();
-      toast('已移出回收站');
+      toast('Moved back to the list');
     });
     acts.appendChild(back);
   } else {
     const restore = document.createElement('button');
     restore.className = 'link-act';
-    restore.textContent = '↗ 恢复全部';
-    restore.title = '在当前位置打开本组全部标签' + (group.locked ? '（已锁定：打开后本组保留）' : '，并从列表中移除');
-    restore.addEventListener('click', () => restoreGroup(group, 'this'));
+    restore.textContent = '↗ Restore all';
+    restore.title =
+      'Open every page in this group' + (group.locked ? ' (locked: group is kept)' : ', then remove the group from the list');
+    restore.addEventListener('click', () => {
+      if (isSynth) openPages(group.tabs);
+      else restoreGroup(group, 'this');
+    });
     acts.appendChild(restore);
   }
 
-  const more = document.createElement('button');
-  more.className = 'link-act';
-  more.textContent = '⋮ 更多…';
-  more.addEventListener('click', (e) => {
-    e.stopPropagation(); // 阻止冒泡到 document 的「点外部关闭」，否则菜单会刚开就被关
-    const r = e.currentTarget.getBoundingClientRect();
-    openMenu(r, folder === 'trash' ? trashMenu(group) : groupMenu(group));
-  });
-  acts.appendChild(more);
+  if (!isSynth) {
+    const more = document.createElement('button');
+    more.className = 'link-act';
+    more.textContent = '⋮ More…';
+    more.addEventListener('click', (e) => {
+      e.stopPropagation(); // 阻止冒泡到 document 的「点外部关闭」，否则菜单会刚开就被关
+      const r = e.currentTarget.getBoundingClientRect();
+      openMenu(r, folder === 'trash' ? trashMenu(group) : groupMenu(group));
+    });
+    acts.appendChild(more);
+  }
   right.appendChild(acts);
   head.appendChild(right);
   card.appendChild(head);
@@ -328,7 +343,7 @@ function buildCard(group) {
   card.appendChild(list);
 
   /* 拖拽落点挂在整张卡片上：卡片空白处（含头部）也能接收，落到列表范围内时按行插入 */
-  if (folder !== 'trash') {
+  if (folder !== 'trash' && !isSynth) {
     card.addEventListener('dragover', (e) => {
       if (!dragSrc) return;
       e.preventDefault();
@@ -363,9 +378,9 @@ function buildCard(group) {
       const src = dragSrc;
       dragSrc = null;
       clearDropLines();
-      if (moveTab(src.gid, src.url, group.id, index)) {
+      if (tdMoveTabTo(state, src.gid, src.url, group.id, index)) {
         await persist();
-        toast('已移动 1 个标签');
+        toast('Moved 1 page');
       } else {
         render();
       }
@@ -378,7 +393,7 @@ function buildCard(group) {
     list.hidden = group.collapsed;
     chev.textContent = group.collapsed ? '▼' : '▲';
     selfSaveAt = Date.now();
-    await otSaveState(state);
+    await tdSaveState(state);
   });
 
   return card;
@@ -391,9 +406,9 @@ function render() {
   clearDropLines();
   renderRail();
 
-  const def = ONETAB_FOLDERS.find((f) => f.key === folder) || ONETAB_FOLDERS[0];
-  const groups = otGroupsFor(state, folder, { query, namedOnly });
-  ui.chName.textContent = def.label + (query ? '（搜索：' + query + '）' : '');
+  const def = TABDOCK_FOLDERS.find((f) => f.key === folder) || TABDOCK_FOLDERS[0];
+  const groups = tdGroupsFor(state, folder, { query, namedOnly });
+  ui.chName.textContent = def.label + (query ? ' (search: ' + query + ')' : '');
   ui.chCount.textContent = String(groups.length);
 
   ui.cards.innerHTML = '';
@@ -402,17 +417,21 @@ function render() {
     const h = ui.empty.querySelector('h2');
     const ps = ui.empty.querySelectorAll('p');
     if (query) {
-      h.textContent = '没有匹配的分组';
-      ps[0].textContent = '换个关键词，或清空搜索框。';
+      h.textContent = 'No matches';
+      ps[0].textContent = 'Try another keyword, or clear the search box.';
       ps[1].textContent = '';
     } else if (folder === 'trash') {
-      h.textContent = '回收站是空的';
-      ps[0].textContent = '在任意卡片上「⋮ 更多… → 移到回收站」的条目会先落到这里，可随时恢复。';
+      h.textContent = 'Trash is empty';
+      ps[0].textContent = 'Groups you delete with “⋮ More… → Move to trash” land here first — you can restore them any time.';
+      ps[1].textContent = '';
+    } else if (folder === 'star') {
+      h.textContent = 'No starred pages yet';
+      ps[0].textContent = 'Hover any page and hit ★ (or use its ⋮ menu) to star it. Starred pages from every group show up here.';
       ps[1].textContent = '';
     } else {
-      h.textContent = '这里还没有内容';
-      ps[0].textContent = '点右上角「收入全部窗口」，或在浏览的网页上右键 → 🗂 OneTab → 收入当前 / 所有标签。';
-      ps[1].textContent = '一次收纳生成一张卡片；卡片里的每个链接都能拖到别的卡片里重新归类。';
+      h.textContent = 'Nothing here yet';
+      ps[0].textContent = 'Hit “Collect all windows” in the top-right, or right-click a page → 🗂 Tab Dock → Dock current / all tabs.';
+      ps[1].textContent = 'Each dock action becomes one group; drag any page between groups to reorganise.';
     }
     return;
   }
@@ -453,6 +472,128 @@ function openMenu(anchorRect, items) {
   m.style.top = Math.max(window.scrollY + 8, top) + 'px';
 }
 
+/* 单条网页的 ⋮ 菜单：星标 / 移动到别的分组（或新建命名分组）/ 用新窗口打开 */
+function tabMenu(gid, tab) {
+  return [
+    {
+      label: tab.star ? '★ Unstar this page' : '☆ Star this page',
+      action: async () => {
+        tdStarTab(state, gid, tab.url, !tab.star);
+        await persist();
+        toast(tab.star ? 'Star removed' : 'Starred — find it under ⭐ Starred');
+      }
+    },
+    { label: 'Move to group…', action: () => openMoveDialog(gid, tab) },
+    { sep: true },
+    { label: 'Open in new window', action: () => openPages([tab], 'new') },
+    { label: 'Open in incognito window', action: () => openPages([tab], 'incognito') }
+  ];
+}
+
+/** 打开一批页面（不改变列表内容），并反馈「被 Chrome 拒绝」的数量 */
+async function openPages(tabs, mode) {
+  const r = await tdOpenTabs(tabs, mode || 'this');
+  if (!r.opened) {
+    toast(r.failed ? 'Chrome refused to open this page' : 'Nothing to open');
+    return;
+  }
+  toast(
+    'Opened ' + r.opened + ' page' + (r.opened === 1 ? '' : 's') +
+      (r.failed ? ' · ' + r.failed + ' blocked by Chrome' : '')
+  );
+}
+
+/* ---------- 移动对话框 ---------- */
+
+function closeDialog() {
+  const d = document.getElementById('dialog');
+  if (d) d.remove();
+}
+
+/**
+ * 「移动到分组」：列出其它分组供一键搬运，或直接输入名字新建一个分组
+ * （例如把散落各处的工作相关网页收进 Work Panel）。
+ */
+function openMoveDialog(gid, tab) {
+  closeDialog();
+  const wrap = document.createElement('div');
+  wrap.className = 'modal';
+  wrap.id = 'dialog';
+
+  const panel = document.createElement('div');
+  panel.className = 'modal-panel';
+
+  const h = document.createElement('h3');
+  const label = String(tab.title || tab.url);
+  h.textContent = 'Move “' + (label.length > 48 ? label.slice(0, 48) + '…' : label) + '” to…';
+  panel.appendChild(h);
+
+  const list = document.createElement('div');
+  list.className = 'pick-list';
+  const others = (state.groups || []).filter((g) => g.id !== gid);
+  if (!others.length) {
+    const tip = document.createElement('div');
+    tip.className = 'pick-empty';
+    tip.textContent = 'No other group yet — create one below.';
+    list.appendChild(tip);
+  }
+  others.forEach((g) => {
+    const b = document.createElement('button');
+    b.className = 'pick-item';
+    const nm = document.createElement('span');
+    nm.className = 'pick-name';
+    nm.textContent = String(g.name || '').trim() || tdCountLabel(g.tabs.length);
+    const cnt = document.createElement('span');
+    cnt.className = 'pick-count';
+    cnt.textContent = g.tabs.length + ' tabs';
+    b.append(nm, cnt);
+    b.addEventListener('click', async () => {
+      closeDialog();
+      if (tdMoveTabTo(state, gid, tab.url, g.id, g.tabs.length)) {
+        await persist();
+        toast('Moved to “' + (String(g.name || '').trim() || tdCountLabel(g.tabs.length)) + '”');
+      } else {
+        render();
+      }
+    });
+    list.appendChild(b);
+  });
+  panel.appendChild(list);
+
+  const newRow = document.createElement('div');
+  newRow.className = 'pick-new';
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.placeholder = 'New group name, e.g. Work Panel';
+  const create = document.createElement('button');
+  create.className = 'pick-create';
+  create.textContent = '＋ Create';
+  const doCreate = async () => {
+    const name = input.value.trim();
+    closeDialog();
+    const g = tdGroupFromTab(state, gid, tab.url, name);
+    if (!g) {
+      render();
+      return;
+    }
+    await persist();
+    toast(name ? 'Created “' + name + '”' : 'Created a new group');
+  };
+  create.addEventListener('click', doCreate);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') doCreate();
+  });
+  newRow.append(input, create);
+  panel.appendChild(newRow);
+
+  wrap.appendChild(panel);
+  wrap.addEventListener('click', (e) => {
+    if (e.target === wrap) closeDialog();
+  });
+  document.body.appendChild(wrap);
+  input.focus();
+}
+
 function groupMenu(group) {
   const flag = (key, on, offLabel, onLabel) => ({
     label: group[key] ? onLabel : offLabel,
@@ -462,61 +603,61 @@ function groupMenu(group) {
     }
   });
   return [
-    { label: '恢复到新窗口', action: () => restoreGroup(group, 'new') },
-    { label: '恢复到本窗口', action: () => restoreGroup(group, 'this') },
-    { label: '恢复到无痕窗口', action: () => restoreGroup(group, 'incognito') },
+    { label: 'Restore in new window', action: () => restoreGroup(group, 'new') },
+    { label: 'Restore here', action: () => restoreGroup(group, 'this') },
+    { label: 'Restore in incognito window', action: () => restoreGroup(group, 'incognito') },
     { sep: true },
-    { label: '复制标题与链接', action: () => copyGroup(group) },
-    { label: '重命名 / 加备注…', action: () => renameGroup(group) },
-    flag('locked', true, '锁定（恢复全部时保留）', '取消锁定'),
-    flag('star', true, '加星标', '取消星标'),
-    flag('pending', true, '标记为待办', '取消待办'),
-    flag('archived', true, '标记为已归档', '取消归档'),
+    { label: 'Copy titles & URLs', action: () => copyGroup(group) },
+    { label: 'Rename / add note…', action: () => renameGroup(group) },
+    flag('locked', true, 'Lock (keep this group after restore)', 'Unlock'),
+    flag('star', true, 'Star this group', 'Unstar this group'),
+    flag('pending', true, 'Mark as pending', 'Unmark pending'),
+    flag('archived', true, 'Mark as archived', 'Unmark archived'),
     {
-      label: group.pinned ? '取消置顶' : '置顶到最前',
+      label: group.pinned ? 'Unpin' : 'Pin to top',
       action: async () => {
         if (group.pinned) {
           group.pinned = false;
         } else {
-          otPin(state, group.id);
+          tdPin(state, group.id);
         }
         await persist();
       }
     },
     { sep: true },
-    { label: '在此处粘贴链接…', action: () => importInto(group) },
-    { label: '在本组上方新建分组…', action: () => createNear(group, 'above') },
-    { label: '在本组下方新建分组…', action: () => createNear(group, 'below') },
+    { label: 'Paste links here…', action: () => importInto(group) },
+    { label: 'New group above…', action: () => createNear(group, 'above') },
+    { label: 'New group below…', action: () => createNear(group, 'below') },
     {
-      label: '移除本组重复项',
+      label: 'Remove duplicates in this group',
       action: async () => {
-        const n = otRemoveDuplicatesIn(group);
+        const n = tdRemoveDuplicatesIn(group);
         await persist();
-        toast(n ? '已移除 ' + n + ' 个重复链接' : '本组没有重复链接');
+        toast(n ? 'Removed ' + n + ' duplicate links' : 'No duplicates in this group');
       }
     },
     {
-      label: '上移',
+      label: 'Move up',
       action: async () => {
-        if (!otMove(state, group.id, 'up')) toast('已经在最前面了');
+        if (!tdMove(state, group.id, 'up')) toast('Already at the top');
         await persist();
       }
     },
     {
-      label: '下移',
+      label: 'Move down',
       action: async () => {
-        if (!otMove(state, group.id, 'down')) toast('已经在最后面了');
+        if (!tdMove(state, group.id, 'down')) toast('Already at the bottom');
         await persist();
       }
     },
     { sep: true },
     {
-      label: '移到回收站',
+      label: 'Move to trash',
       danger: true,
       action: async () => {
-        otMoveToTrash(state, group.id);
+        tdMoveToTrash(state, group.id);
         await persist();
-        toast('已移到回收站，可随时恢复');
+        toast('Moved to trash — restorable any time');
       }
     }
   ];
@@ -525,27 +666,27 @@ function groupMenu(group) {
 function trashMenu(group) {
   return [
     {
-      label: '恢复到列表',
+      label: 'Restore to list',
       action: async () => {
-        otRestoreFromTrash(state, group.id);
+        tdRestoreFromTrash(state, group.id);
         await persist();
-        toast('已恢复到列表顶部');
+        toast('Restored to the top of the list');
       }
     },
-    { label: '恢复到新窗口', action: () => restoreGroup(group, 'new', true) },
+    { label: 'Restore in new window', action: () => restoreGroup(group, 'new', true) },
     {
-      label: '复制标题与链接',
+      label: 'Copy titles & URLs',
       action: () => copyGroup(group)
     },
     { sep: true },
     {
-      label: '彻底删除',
+      label: 'Delete forever',
       danger: true,
       action: async () => {
-        if (!confirm('彻底删除这一组？无法恢复。')) return;
-        otDeleteForever(state, group.id);
+        if (!confirm('Delete this group forever? This cannot be undone.')) return;
+        tdDeleteForever(state, group.id);
         await persist();
-        toast('已彻底删除');
+        toast('Deleted');
       }
     }
   ];
@@ -553,40 +694,40 @@ function trashMenu(group) {
 
 function topMenu() {
   const items = [];
-  items.push({ label: '收入当前窗口标签', action: () => collect({ currentWindow: true }) });
-  items.push({ label: '收入所有窗口标签', action: () => collect({}) });
+  items.push({ label: 'Dock tabs in current window', action: () => collect({ currentWindow: true }) });
+  items.push({ label: 'Dock tabs in all windows', action: () => collect({}) });
   items.push({ sep: true });
-  items.push({ label: '导出为文本（OneTab 兼容）', action: () => exportFile('txt') });
-  items.push({ label: '导出为 JSON（完整备份）', action: () => exportFile('json') });
-  items.push({ label: '从文件导入…', action: () => ui.file.click() });
-  items.push({ label: '粘贴链接导入…', action: () => importPasted() });
+  items.push({ label: 'Export as text (portable)', action: () => exportFile('txt') });
+  items.push({ label: 'Export as JSON (full backup)', action: () => exportFile('json') });
+  items.push({ label: 'Import from file…', action: () => ui.file.click() });
+  items.push({ label: 'Import from pasted links…', action: () => importPasted() });
   items.push({ sep: true });
   items.push({
-    label: '移除全部重复项',
+    label: 'Remove all duplicates',
     action: async () => {
-      const n = otRemoveDuplicates(state);
+      const n = tdRemoveDuplicates(state);
       await persist();
-      toast(n ? '已移除 ' + n + ' 个重复链接' : '没有发现重复链接');
+      toast(n ? 'Removed ' + n + ' duplicate links' : 'No duplicates found');
     }
   });
   if (folder === 'trash') {
     items.push({
-      label: '清空回收站',
+      label: 'Empty trash',
       danger: true,
       action: async () => {
-        const n = otEmptyTrash(state);
+        const n = tdEmptyTrash(state);
         if (!n) {
-          toast('回收站已经是空的');
+          toast('Trash is already empty');
           return;
         }
-        if (!confirm('清空回收站？' + n + ' 个分组将被彻底删除。')) return;
+        if (!confirm('Empty trash? ' + n + ' group(s) will be deleted forever.')) return;
         await persist();
-        toast('已清空 ' + n + ' 个分组');
+        toast('Emptied ' + n + ' group(s)');
       }
     });
   }
   items.push({ sep: true });
-  items.push({ label: '打开设置', action: () => chrome.runtime.openOptionsPage() });
+  items.push({ label: 'Open settings', action: () => chrome.runtime.openOptionsPage() });
   return items;
 }
 
@@ -594,23 +735,27 @@ function topMenu() {
 
 async function restoreGroup(group, mode, fromTrash) {
   try {
-    const n = await otOpenTabs(group.tabs, mode);
-    if (!n) {
-      toast('没有可恢复的网页');
+    const r = await tdOpenTabs(group.tabs, mode);
+    if (!r.opened) {
+      toast(r.failed ? 'Chrome refused to open these pages' : 'No page to restore');
       return;
     }
     if (fromTrash) {
-      otDeleteForever(state, group.id);
+      tdDeleteForever(state, group.id);
     } else if (!group.locked) {
       state.groups = state.groups.filter((g) => g.id !== group.id);
     }
     await persist();
-    toast('已恢复 ' + n + ' 个标签' + (group.locked && !fromTrash ? '（已锁定，本组保留）' : ''));
+    toast(
+      'Restored ' + r.opened + ' tab' + (r.opened === 1 ? '' : 's') +
+        (r.failed ? ' · ' + r.failed + ' blocked by Chrome' : '') +
+        (group.locked && !fromTrash ? ' (locked — group kept)' : '')
+    );
   } catch (e) {
     toast(
       mode === 'incognito'
-        ? '无痕窗口打开失败：请在扩展详情里开启「允许在无痕模式下使用」，然后重试'
-        : '打开失败：' + (e && e.message ? e.message : e)
+        ? 'Incognito failed: enable “Allow in incognito” for this extension, then retry'
+        : 'Failed to open: ' + (e && e.message ? e.message : e)
     );
   }
 }
@@ -618,27 +763,29 @@ async function restoreGroup(group, mode, fromTrash) {
 async function collect(opt) {
   try {
     const tabs = await chrome.tabs.query(opt);
-    const items = otTabsFromBrowser(tabs);
+    const items = tdTabsFromBrowser(tabs);
     if (!items.length) {
-      toast('当前没有可收纳的网页标签');
+      toast('No dockable tab in this window');
       return;
     }
-    const group = otCollect(state, items, '');
+    const skipped = tdSkippedCount(tabs, items);
+    tdCollect(state, items, '');
     await persist();
-    const res = await otCloseBrowserTabs(tabs);
+    const res = await tdCloseBrowserTabs(tabs);
     toast(
-      '已收入 ' + items.length + ' 个标签，关闭 ' + res.closed + ' 个以释放内存' +
-        (res.kept ? '（每个窗口保留最后一个页签，避免整窗被关掉）' : '')
+      'Docked ' + items.length + ' tabs, closed ' + res.closed + ' to free memory' +
+        (skipped ? ' · ' + skipped + ' duplicate(s) skipped' : '') +
+        (res.kept ? ' (kept each window’s last tab so the window stays open)' : '')
     );
   } catch (e) {
-    toast('收纳失败：' + (e && e.message ? e.message : e));
+    toast('Dock failed: ' + (e && e.message ? e.message : e));
   }
 }
 
 async function copyGroup(group) {
   const text = group.tabs.map((t) => (t.title || t.url) + '\n' + t.url).join('\n\n');
   const ok = await copyText(text);
-  toast(ok ? '已复制 ' + group.tabs.length + ' 条标题与链接' : '复制失败，请手动选择文本');
+  toast(ok ? 'Copied ' + group.tabs.length + ' titles & URLs' : 'Copy failed — select the text manually');
 }
 
 async function copyText(text) {
@@ -662,9 +809,9 @@ async function copyText(text) {
 }
 
 async function renameGroup(group) {
-  const name = prompt('分组名称（留空则显示为「N tabs」）', group.name || '');
+  const name = prompt('Group name (leave blank to show “N tabs”)', group.name || '');
   if (name === null) return;
-  const note = prompt('备注 / 提示（可留空）', group.note || '');
+  const note = prompt('Note (optional)', group.note || '');
   if (note === null) return;
   group.name = name.trim();
   group.note = note.trim();
@@ -672,60 +819,60 @@ async function renameGroup(group) {
 }
 
 async function importInto(group) {
-  const text = prompt('粘贴链接（每行一个，可直接粘贴 OneTab 导出的文本）');
+  const text = prompt('Paste links (one per line)');
   if (!text) return;
-  const parsed = otParseImport(text);
+  const parsed = tdParseImport(text);
   const tabs = parsed.flatMap((g) => g.tabs);
   if (!tabs.length) {
-    toast('没有解析到链接');
+    toast('No link found');
     return;
   }
   const seen = new Set(group.tabs.map((t) => t.url));
   let added = 0;
   tabs.forEach((t) => {
     if (seen.has(t.url)) return;
-    group.tabs.push(otPickTab(t));
+    group.tabs.push(tdPickTab(t));
     seen.add(t.url);
     added++;
   });
   await persist();
-  toast(added ? '已加入 ' + added + ' 条链接' : '链接都已存在，未新增');
+  toast(added ? 'Added ' + added + ' link(s)' : 'All links already exist');
 }
 
 async function createNear(group, where) {
-  const name = prompt('新分组名称（可留空）', '');
+  const name = prompt('New group name (optional)', '');
   if (name === null) return;
-  const text = prompt('粘贴该分组的链接（每行一个，或直接粘贴 OneTab 文本）');
+  const text = prompt('Paste links for this group (one per line)');
   if (!text) return;
-  const parsed = otParseImport(text);
+  const parsed = tdParseImport(text);
   const tabs = parsed.flatMap((g) => g.tabs);
   if (!tabs.length) {
-    toast('没有解析到链接，未创建分组');
+    toast('No link found — group not created');
     return;
   }
-  const g = otMakeGroup(tabs, name.trim());
+  const g = tdMakeGroup(tabs, name.trim());
   const i = state.groups.findIndex((x) => x.id === group.id);
   state.groups.splice(where === 'above' ? i : i + 1, 0, g);
   await persist();
-  toast('已新建分组（' + tabs.length + ' 个链接）');
+  toast('Group created (' + tabs.length + ' links)');
 }
 
 async function importPasted() {
-  const text = prompt('粘贴要导入的内容（OneTab 文本 / JSON / 一堆链接均可）');
+  const text = prompt('Paste content to import (text / JSON / raw links)');
   if (!text) return;
-  applyImport(text, '粘贴');
+  applyImport(text, 'Paste');
 }
 
 function applyImport(text, source) {
-  const groups = otParseImport(text);
+  const groups = tdParseImport(text);
   if (!groups.length) {
-    toast('没有解析到可导入的链接');
+    toast('No importable link found');
     return;
   }
   const total = groups.reduce((n, g) => n + g.tabs.length, 0);
   groups.slice().reverse().forEach((g) => state.groups.unshift(g));
   persist();
-  toast('已从' + source + '导入 ' + groups.length + ' 个分组 / ' + total + ' 个链接');
+  toast('Imported ' + groups.length + ' group(s) / ' + total + ' link(s) from ' + source);
 }
 
 /* ---------- 导入导出 ---------- */
@@ -744,15 +891,15 @@ function download(filename, text, mime) {
 
 function exportFile(kind) {
   if (!state.groups.length) {
-    toast('列表为空，没有可导出的内容');
+    toast('Nothing to export');
     return;
   }
   if (kind === 'json') {
-    download('onetab-backup', otExportJSON(state), 'application/json');
+    download('tabdock-backup', tdExportJSON(state), 'application/json');
   } else {
-    download('onetab-export', otExportText(state), 'text/plain');
+    download('tabdock-export', tdExportText(state), 'text/plain');
   }
-  toast('已导出 ' + state.groups.length + ' 个分组');
+  toast('Exported ' + state.groups.length + ' group(s)');
 }
 
 /* ---------- 事件 ---------- */
@@ -776,11 +923,11 @@ function bind() {
     e.stopPropagation();
     const r = e.currentTarget.getBoundingClientRect();
     openMenu(r, [
-      { label: '导出为文本（OneTab 兼容）', action: () => exportFile('txt') },
-      { label: '导出为 JSON（完整备份）', action: () => exportFile('json') },
+      { label: 'Export as text (portable)', action: () => exportFile('txt') },
+      { label: 'Export as JSON (full backup)', action: () => exportFile('json') },
       { sep: true },
-      { label: '从文件导入…', action: () => ui.file.click() },
-      { label: '粘贴链接导入…', action: () => importPasted() }
+      { label: 'Import from file…', action: () => ui.file.click() },
+      { label: 'Import from pasted links…', action: () => importPasted() }
     ]);
   });
   ui.btnOptions.addEventListener('click', () => chrome.runtime.openOptionsPage());
@@ -790,7 +937,7 @@ function bind() {
     ui.file.value = '';
     if (!f) return;
     const reader = new FileReader();
-    reader.onload = () => applyImport(String(reader.result || ''), '文件 ' + f.name);
+    reader.onload = () => applyImport(String(reader.result || ''), 'File ' + f.name);
     reader.readAsText(f);
   });
 
@@ -798,16 +945,18 @@ function bind() {
     if (!ui.menu.hidden && !ui.menu.contains(e.target)) closeMenu();
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeMenu();
+    if (e.key !== 'Escape') return;
+    closeMenu();
+    closeDialog();
   });
   window.addEventListener('resize', closeMenu);
   window.addEventListener('scroll', closeMenu, true);
 
   if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
     chrome.storage.onChanged.addListener((changes, area) => {
-      if (area !== 'local' || !changes[ONETAB_KEY]) return;
+      if (area !== 'local' || !changes[TABDOCK_KEY]) return;
       if (Date.now() - selfSaveAt < 350) return; // 自己刚写的，忽略回声
-      otLoadState().then((s) => {
+      tdLoadState().then((s) => {
         state = s;
         render();
       });
@@ -818,7 +967,7 @@ function bind() {
 boot();
 
 async function boot() {
-  state = await otLoadState();
+  state = await tdLoadState();
   bind();
   render();
 }

@@ -14,7 +14,7 @@ let prompts = [];
 let saveTimer = null;
 let draggingId = null;
 
-init().catch((err) => console.error('[学习助手] 设置页初始化失败:', err));
+init().catch((err) => console.error('[webbuddy] settings init failed:', err));
 
 async function init() {
   settings = await getMergedSettings();
@@ -25,6 +25,21 @@ async function init() {
   await loadAdBlock();
   renderPromptList();
   bindEvents();
+
+  // 让「配置到底在不在」一眼可见，避免误以为丢失而重复填写
+  if (wasSettingsRestored()) {
+    setMsg('api-msg', 'Config was missing — restored from backup ✓ (no need to re-enter)', 'ok');
+  } else if (settings.api.apiKey) {
+    setMsg('api-msg', 'Config loaded · key ' + maskKey(settings.api.apiKey), 'ok');
+  }
+}
+
+/** 只显示首尾，中间打码：确认保存的是哪个 key，又不泄露 */
+function maskKey(key) {
+  const s = String(key || '');
+  if (!s) return '(empty)';
+  if (s.length <= 8) return s.slice(0, 2) + '••••';
+  return s.slice(0, 3) + '••••' + s.slice(-4);
 }
 
 /* ================= API 配置 ================= */
@@ -59,7 +74,7 @@ async function ensureHostPermission(baseURL) {
     if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error('protocol');
     origin = u.origin + '/*';
   } catch {
-    return { ok: false, error: 'baseURL 不是合法的 http(s) 地址' };
+    return { ok: false, error: 'baseURL is not a valid http(s) address' };
   }
   const has = await chrome.permissions.contains({ origins: [origin] });
   if (has) return { ok: true, origin, already: true };
@@ -69,8 +84,8 @@ async function ensureHostPermission(baseURL) {
 
 async function saveAPI() {
   const api = currentAPI();
-  if (!api.baseURL) return setMsg('api-msg', '请填写 baseURL', 'err');
-  if (!api.model) return setMsg('api-msg', '请填写 model（如 deepseek-flash）', 'err');
+  if (!api.baseURL) return setMsg('api-msg', 'Please fill in baseURL', 'err');
+  if (!api.model) return setMsg('api-msg', 'Please fill in model (e.g. deepseek-flash)', 'err');
 
   const perm = await ensureHostPermission(api.baseURL);
   // 无论权限是否授予，先更新 savedAPI 再落盘——否则预设自动保存会把旧值带回盘
@@ -79,33 +94,38 @@ async function saveAPI() {
     if (perm.error) return setMsg('api-msg', perm.error, 'err');
     // 权限被拒：仍保存配置，但明确警告
     await saveSettings(fullSettings(api));
-    return setMsg('api-msg', '已保存，但域名授权被拒绝——请求可能失败。重新点一次「保存并授权域名」即可再次弹窗。', 'err');
+    return setMsg('api-msg', 'Saved, but the origin grant was declined — requests may fail. Click “Save & grant origin” again to re-prompt.', 'err');
   }
   await saveSettings(fullSettings(api));
-  setMsg('api-msg', perm.already ? '已保存 ✓（域名权限此前已授予）' : '已保存 ✓ 并已授权 ' + perm.origin, 'ok');
+  setMsg(
+    'api-msg',
+    'Saved ✓ · key ' + maskKey(api.apiKey) +
+      (perm.already ? ' (origin permission already granted)' : ' · granted ' + perm.origin),
+    'ok'
+  );
 }
 
 async function testAPI() {
   const api = currentAPI();
-  if (!api.baseURL || !api.model) return setMsg('api-msg', '先填写 baseURL 和 model', 'err');
+  if (!api.baseURL || !api.model) return setMsg('api-msg', 'Fill in baseURL and model first', 'err');
   const perm = await ensureHostPermission(api.baseURL);
-  if (!perm.ok) return setMsg('api-msg', perm.error || '未授予域名访问权限，无法测试', 'err');
+  if (!perm.ok) return setMsg('api-msg', perm.error || 'Origin access not granted — cannot test', 'err');
 
   const url = normalizeChatURL(api.baseURL);
-  setMsg('api-msg', '测试中… → ' + url, '');
+  setMsg('api-msg', 'Testing… → ' + url, '');
   let out = '';
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), 20000);
   try {
     await callOpenAICompatible({
       api,
-      messages: [{ role: 'user', content: '你好' }],
+      messages: [{ role: 'user', content: 'Hi' }],
       signal: ctl.signal,
       extraBody: { max_tokens: 8 },
       onDelta: (d) => (out += d)
     });
     clearTimeout(timer);
-    setMsg('api-msg', '连接成功 ✓ ' + url + ' · 回复：' + (out.slice(0, 30) || '(空)'), 'ok');
+    setMsg('api-msg', 'Connected ✓ ' + url + ' · reply: ' + (out.slice(0, 30) || '(empty)'), 'ok');
   } catch (err) {
     clearTimeout(timer);
     setMsg('api-msg', describeAPIError(err, err && err.name === 'AbortError'), 'err');
@@ -129,31 +149,31 @@ function renderPromptList() {
 
       const drag = document.createElement('span');
       drag.className = 'drag';
-      drag.title = '拖拽排序';
+      drag.title = 'Drag to reorder';
       drag.textContent = '⠿';
 
       const enabled = document.createElement('input');
       enabled.type = 'checkbox';
       enabled.checked = p.enabled !== false;
-      enabled.title = '启用 / 禁用';
+      enabled.title = 'Enable / disable';
 
       const main = document.createElement('div');
       main.className = 'p-main';
       const label = document.createElement('input');
       label.className = 'p-label';
       label.value = p.label;
-      label.placeholder = '问题名称（右键菜单显示）';
+      label.placeholder = 'Question name (shown in the right-click menu)';
       const template = document.createElement('textarea');
       template.className = 'p-template';
       template.rows = 2;
       template.value = p.template;
-      template.placeholder = '模板，可用 {{text}} {{title}} {{url}} {{lang}}';
+      template.placeholder = 'Template; {{text}} {{title}} {{url}} {{lang}} available';
       main.append(label, template);
 
       const del = document.createElement('button');
       del.className = 'p-del';
       del.type = 'button';
-      del.textContent = '删除';
+      del.textContent = 'Delete';
 
       row.append(drag, enabled, main, del);
       list.appendChild(row);
@@ -171,7 +191,7 @@ function renderPromptList() {
         scheduleSavePrompts();
       });
       del.addEventListener('click', () => {
-        if (!confirm('删除预设「' + (p.label || '未命名') + '」？')) return;
+        if (!confirm('Delete preset “' + (p.label || 'Untitled') + '”?')) return;
         prompts = prompts.filter((x) => x.id !== p.id);
         renderPromptList();
         savePromptsNow();
@@ -219,7 +239,7 @@ function commitOrder() {
 function addPrompt() {
   prompts.push({
     id: crypto.randomUUID(),
-    label: '新问题',
+    label: 'New question',
     template: '关于「{{text}}」：',
     order: prompts.length + 1,
     enabled: true
@@ -254,19 +274,19 @@ async function importPrompts(e) {
   try {
     data = JSON.parse(await file.text());
   } catch {
-    return setMsg('prompt-msg', 'JSON 解析失败', 'err');
+    return setMsg('prompt-msg', 'JSON parse failed', 'err');
   }
   if (
     !Array.isArray(data) ||
     !data.length ||
     !data.every((x) => x && typeof x.label === 'string' && typeof x.template === 'string')
   ) {
-    return setMsg('prompt-msg', '格式不符：需要 [{ "label": …, "template": … }] 数组', 'err');
+    return setMsg('prompt-msg', 'Wrong format: expected an array [{ "label": …, "template": … }]', 'err');
   }
-  if (!confirm('导入 ' + data.length + ' 条预设，将替换当前 ' + prompts.length + ' 条，继续？')) return;
+  if (!confirm('Import ' + data.length + ' presets, replacing the current ' + prompts.length + '. Continue?')) return;
   prompts = data.map((x, i) => ({
     id: crypto.randomUUID(),
-    label: x.label.trim() || '问题' + (i + 1),
+    label: x.label.trim() || 'Question ' + (i + 1),
     template: x.template,
     order: Number.isFinite(x.order) ? x.order : i + 1,
     enabled: x.enabled !== false
@@ -286,7 +306,7 @@ async function savePromptsNow() {
   clearTimeout(saveTimer);
   // 不传参：API 一律用已保存的 savedAPI，绝不把表单草稿带进盘
   await saveSettings(fullSettings());
-  setMsg('prompt-msg', '已保存 ✓', 'ok');
+  setMsg('prompt-msg', 'Saved ✓', 'ok');
 }
 
 /* ================= 界面与会话 ================= */
@@ -307,7 +327,7 @@ function currentUI() {
 
 async function saveUINow() {
   await saveSettings(fullSettings());
-  setMsg('ui-msg', '已保存 ✓', 'ok');
+  setMsg('ui-msg', 'Saved ✓', 'ok');
 }
 
 /* ================= 免广告（独立配置） ================= */
@@ -325,7 +345,7 @@ async function loadAdBlock() {
 async function saveAdBlock() {
   const enabled = $('ad-block').checked;
   await chrome.storage.local.set({ [AD_KEY]: { enabled } });
-  setMsg('ui-msg', enabled ? '免广告已开启 ✓' : '免广告已关闭', 'ok');
+  setMsg('ui-msg', enabled ? 'Ad block on ✓' : 'Ad block off', 'ok');
 }
 
 /* ================= 杂项 ================= */
@@ -346,7 +366,7 @@ function bindEvents() {
     btn.addEventListener('click', () => {
       $('api-baseurl').value = btn.dataset.base;
       if (btn.dataset.model) $('api-model').value = btn.dataset.model;
-      setMsg('api-msg', '已填充，记得「保存并授权域名」', '');
+      setMsg('api-msg', 'Filled in — remember to hit “Save & grant origin”', '');
     });
   });
 
@@ -354,7 +374,7 @@ function bindEvents() {
     const inp = $('api-key');
     const show = inp.type === 'password';
     inp.type = show ? 'text' : 'password';
-    $('toggle-key').textContent = show ? '隐藏' : '显示';
+    $('toggle-key').textContent = show ? 'Hide' : 'Show';
   });
 
   $('api-temp-range').addEventListener('input', () => {

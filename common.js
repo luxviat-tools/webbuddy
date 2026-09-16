@@ -12,6 +12,7 @@ const MARKER_KEY = 'processedTaskId'; // storage.session：面板已消费的任
 const CTX_KEY = 'pageCtx';          // storage.session：最近捕获的页面上下文（自由提问用）
 const IMG_KEY = 'imageControl';     // storage.local：图片控制配置 { mode }
 const AD_KEY = 'adBlock';           // storage.local：免广告配置 { enabled }
+const SETTINGS_BK_KEY = 'settingsBackup'; // storage.local：API 配置防丢备份（见 getMergedSettings）
 
 /** 「解读当前页面」内置提示词（页面正文由 system 注入） */
 const PAGE_SUMMARY_PROMPT =
@@ -47,28 +48,28 @@ const DEFAULT_SETTINGS = {
   prompts: [
     {
       id: 'p1',
-      label: '三句话说清',
+      label: 'Summarize in 3 lines',
       template: '用三句话说清「{{text}}」是什么、为什么有人关心它。不要展开。',
       order: 1,
       enabled: true
     },
     {
       id: 'p2',
-      label: '类比定位',
+      label: 'Find an analogy',
       template: '「{{text}}」和我可能已经知道的哪个概念最接近？只讲区别。',
       order: 2,
       enabled: true
     },
     {
       id: 'p3',
-      label: '为什么重要',
+      label: 'Why it matters',
       template: '「{{text}}」是为了解决什么问题出现的？之前人们怎么处理？',
       order: 3,
       enabled: true
     },
     {
       id: 'p4',
-      label: '外行版解释',
+      label: 'Explain for a newcomer',
       template: '解释「{{text}}」，假设我是刚入行的外行，避免使用该领域术语；必须用到的要当场解释。',
       order: 4,
       enabled: true
@@ -88,7 +89,7 @@ function mergeSettings(saved) {
     Array.isArray(s.prompts) && s.prompts.length
       ? s.prompts.map((p, i) => ({
           id: p.id || 'p' + (i + 1) + '-' + Math.random().toString(36).slice(2, 8),
-          label: String(p.label || '问题' + (i + 1)),
+          label: String(p.label || 'Question ' + (i + 1)),
           template: String(p.template || ''),
           order: Number.isFinite(p.order) ? p.order : i + 1,
           enabled: p.enabled !== false
@@ -105,13 +106,43 @@ function mergeSettings(saved) {
   };
 }
 
+/**
+ * 配置读写入口（带「防丢」备份）：
+ * 每次保存带 apiKey 的配置时，额外写一份 settingsBackup；
+ * 读取时若发现 settings 整条记录不存在（扩展重装 / 存储被清 / 换了扩展 ID 导致命名空间变化），
+ * 但备份还在，就自动恢复，避免用户重新填一遍 baseURL / Key / model。
+ *
+ * 注意：只在 settings **完全缺失**时才恢复。用户主动清空 Key 保存时 settings 仍存在
+ * （只是字段为空），不会触发恢复，否则就永远清不掉了。
+ */
+/** 上一次读取是否由备份恢复（供 UI 提示「已自动找回配置」） */
+let settingsRestoredFromBackup = false;
+function wasSettingsRestored() {
+  return settingsRestoredFromBackup;
+}
+
 async function getMergedSettings() {
-  const { settings } = await chrome.storage.local.get('settings');
-  return mergeSettings(settings);
+  settingsRestoredFromBackup = false;
+  const res = await chrome.storage.local.get(['settings', SETTINGS_BK_KEY]);
+  let saved = res.settings;
+  if (!saved) {
+    const bk = res[SETTINGS_BK_KEY];
+    if (bk && bk.api) {
+      saved = bk;
+      settingsRestoredFromBackup = true;
+      await chrome.storage.local.set({ settings: saved });
+    }
+  }
+  return mergeSettings(saved);
 }
 
 /** 保存完整 settings（options 页用，保证三个分区同时落盘） */
 async function saveSettings(settings) {
+  const api = settings && settings.api;
+  // 只备份「有效配置」，避免用空配置把好备份冲掉
+  if (api && api.apiKey) {
+    await chrome.storage.local.set({ [SETTINGS_BK_KEY]: settings });
+  }
   await chrome.storage.local.set({ settings });
 }
 
@@ -149,7 +180,7 @@ function truncateText(s, n) {
  */
 async function callOpenAICompatible({ api, messages, signal, onDelta, extraBody }) {
   const url = normalizeChatURL(api.baseURL);
-  if (!url) throw new Error('未配置 API（baseURL 为空）');
+  if (!url) throw new Error('API not configured (baseURL is empty)');
 
   const headers = { 'Content-Type': 'application/json' };
   if (api.apiKey) headers['Authorization'] = 'Bearer ' + api.apiKey;
@@ -218,31 +249,39 @@ async function callOpenAICompatible({ api, messages, signal, onDelta, extraBody 
   }
 }
 
-/** 将 fetch/HTTP 错误映射为带行动指引的中文提示 */
+/** Map fetch/HTTP errors to actionable messages (UI text: English) */
 function describeAPIError(err, timedOut) {
   if (timedOut || err?.name === 'TimeoutError') {
-    return '连接超时：30 秒内未收到服务器响应。请检查 baseURL 是否可访问，或稍后重试。';
+    return 'Timed out: no response in 30s. Check that baseURL is reachable, then retry.';
   }
   if (err?.status === 400) {
-    return '请求被拒绝（400）：' + (err.body || '请检查 model 名称与参数。');
+    return 'Bad request (400): ' + (err.body || 'Check the model name and parameters.');
   }
   if (err?.status === 401) {
-    return 'API Key 无效或未授权（401）。请到设置页检查 apiKey。';
+    return 'Unauthorized (401): the API key was rejected. Check the key in Settings.';
+  }
+  if (err?.status === 402) {
+    // 余额不足 ≠ 配置丢失：Key 与 baseURL 都还在，充值后即可直接继续用，无需重新配置
+    return (
+      'Insufficient balance (402): your API key and settings are still saved — ' +
+      'top up your account and ask again, no need to reconfigure.' +
+      (err.body ? '\n' + err.body : '')
+    );
   }
   if (err?.status === 403) {
-    return '没有访问权限（403）。请检查 apiKey 与该模型的调用权限。';
+    return 'Forbidden (403): the key has no access to this model.';
   }
   if (err?.status === 404) {
-    return '接口路径不存在（404）。请检查 baseURL（通常以 /v1 结尾），可用设置页「测试连接」查看最终请求地址。';
+    return 'Endpoint not found (404). Check baseURL (usually ends with /v1) — use “Test connection” in Settings to see the final URL.';
   }
   if (err?.status === 429) {
-    return '请求过于频繁或额度不足（429）。请稍后再试。';
+    return 'Rate limited or quota exceeded (429). Try again later.';
   }
   if (err?.status >= 500) {
-    return '服务端错误（' + err.status + '），请稍后重试。' + (err.body ? '\n' + err.body : '');
+    return 'Server error (' + err.status + '), please retry later.' + (err.body ? '\n' + err.body : '');
   }
   if (err instanceof TypeError || /fetch|network|failed/i.test(err?.message || '')) {
-    return '网络请求失败：可能断网、baseURL 无法访问，或该域名的访问权限未授予（在设置页保存配置时请点击「允许」）。';
+    return 'Network request failed: offline, baseURL unreachable, or the origin permission was not granted (click “Allow” when saving in Settings).';
   }
-  return '请求失败：' + (err?.message || String(err));
+  return 'Request failed: ' + (err?.message || String(err));
 }

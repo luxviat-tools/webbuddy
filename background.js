@@ -1,17 +1,17 @@
 'use strict';
 
 /*
- * 学习助手 · Service Worker
+ * webbuddy · Service Worker
  * 职责：右键菜单 → 组装任务 → 写 storage.session → 打开侧边栏。
  * 侧边栏通过 storage.onChanged / 主动读取消费任务，规避 SW 休眠丢消息。
  */
 
-importScripts('common.js', 'onetab-store.js');
+importScripts('common.js', 'tabdock-store.js');
 
 const PARENT_ID = 'ask-ai-parent';
 const CUSTOM_ID = 'ask-ai-custom';
 const PAGE_ID = 'ask-ai-page';
-const ONETAB_PARENT = 'onetab-parent';
+const TABDOCK_PARENT = 'tabdock-parent';
 
 // storage.session 默认仅 SW 可读；必须放开，否则侧边栏静默读不到任务
 chrome.storage.session
@@ -59,7 +59,7 @@ function rebuildMenus() {
       await chrome.contextMenus.removeAll();
       // create 回调里消费 lastError：即使极端情况撞 id 也不会抛 Unchecked runtime.lastError
       chrome.contextMenus.create(
-        { id: PARENT_ID, title: '问 AI', contexts: ['page', 'selection'] },
+        { id: PARENT_ID, title: 'Ask AI', contexts: ['page', 'selection'] },
         () => void chrome.runtime.lastError
       );
       // 解读当前页面：无论是否选中文字都显示（页面级总览）
@@ -67,7 +67,7 @@ function rebuildMenus() {
         {
           id: PAGE_ID,
           parentId: PARENT_ID,
-          title: '📄 解读当前页面',
+          title: '📄 Explain this page',
           contexts: ['page', 'selection']
         },
         () => void chrome.runtime.lastError
@@ -91,30 +91,30 @@ function rebuildMenus() {
         {
           id: CUSTOM_ID,
           parentId: PARENT_ID,
-          title: '✏️ 自定义问题…',
+          title: '✏️ Custom question…',
           contexts: ['selection']
         },
         () => void chrome.runtime.lastError
       );
-      // OneTab：收纳标签页（完全本地，等价于独立插件）
+      // Tab Dock：收纳标签页（完全本地，等价于独立插件）
       chrome.contextMenus.create(
-        { id: ONETAB_PARENT, title: '🗂 OneTab', contexts: ['page'] },
+        { id: TABDOCK_PARENT, title: '🗂 Tab Dock', contexts: ['page'] },
         () => void chrome.runtime.lastError
       );
       chrome.contextMenus.create(
-        { id: 'onetab:current', parentId: ONETAB_PARENT, title: '收入当前标签', contexts: ['page'] },
+        { id: 'tabdock:current', parentId: TABDOCK_PARENT, title: 'Dock this tab', contexts: ['page'] },
         () => void chrome.runtime.lastError
       );
       chrome.contextMenus.create(
-        { id: 'onetab:all', parentId: ONETAB_PARENT, title: '收入所有标签（全部窗口）', contexts: ['page'] },
+        { id: 'tabdock:all', parentId: TABDOCK_PARENT, title: 'Dock all tabs (every window)', contexts: ['page'] },
         () => void chrome.runtime.lastError
       );
       chrome.contextMenus.create(
-        { id: 'onetab:open', parentId: ONETAB_PARENT, title: '打开 OneTab 管理页', contexts: ['page'] },
+        { id: 'tabdock:open', parentId: TABDOCK_PARENT, title: 'Open Tab Dock manager', contexts: ['page'] },
         () => void chrome.runtime.lastError
       );
     })
-    .catch((e) => console.error('[学习助手] 重建右键菜单失败:', e));
+    .catch((e) => console.error('[webbuddy] failed to rebuild context menus:', e));
   return rebuildChain;
 }
 
@@ -157,19 +157,19 @@ chrome.storage.onChanged.addListener((changes, area) => {
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === PARENT_ID || !tab || !tab.id) return;
 
-  // OneTab 类菜单：本地收纳，不涉及问答任务
-  if (info.menuItemId === 'onetab:current' || info.menuItemId === 'onetab:all' || info.menuItemId === 'onetab:open') {
-    if (info.menuItemId === 'onetab:open') {
-      chrome.tabs.create({ url: chrome.runtime.getURL('onetab.html') }).catch(() => {});
+  // Tab Dock 类菜单：本地收纳，不涉及问答任务
+  if (info.menuItemId === 'tabdock:current' || info.menuItemId === 'tabdock:all' || info.menuItemId === 'tabdock:open') {
+    if (info.menuItemId === 'tabdock:open') {
+      chrome.tabs.create({ url: chrome.runtime.getURL('tabdock.html') }).catch(() => {});
       return;
     }
-    if (info.menuItemId === 'onetab:current') {
-      addTabsToOnetab([tab]).catch((e) => console.error('[OneTab] 收纳当前标签失败:', e));
-    } else if (info.menuItemId === 'onetab:all') {
+    if (info.menuItemId === 'tabdock:current') {
+      addTabsToTabDock([tab]).catch((e) => console.error('[Tab Dock] failed to dock current tab:', e));
+    } else if (info.menuItemId === 'tabdock:all') {
       chrome.tabs
         .query({})
-        .then((tabs) => addTabsToOnetab(tabs))
-        .catch((e) => console.error('[OneTab] 收纳全部标签失败:', e));
+        .then((tabs) => addTabsToTabDock(tabs))
+        .catch((e) => console.error('[Tab Dock] failed to dock all tabs:', e));
     }
     return;
   }
@@ -179,17 +179,17 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     chrome.sidePanel.open({ tabId: tab.id }).catch(() => {});
   } catch {}
 
-  dispatchTask(info, tab).catch((e) => console.error('[学习助手] 任务分发失败:', e));
+  dispatchTask(info, tab).catch((e) => console.error('[webbuddy] failed to dispatch task:', e));
 });
 
 /** 右键收纳：一次收纳 = 管理页里的一个分组（与页面/侧栏行为一致），并关闭标签释放内存 */
-async function addTabsToOnetab(tabs) {
-  const items = otTabsFromBrowser(tabs);
+async function addTabsToTabDock(tabs) {
+  const items = tdTabsFromBrowser(tabs);
   if (!items.length) return;
-  const state = await otLoadState();
-  otCollect(state, items, '');
-  await otSaveState(state);
-  await otCloseBrowserTabs(tabs);
+  const state = await tdLoadState();
+  tdCollect(state, items, '');
+  await tdSaveState(state);
+  await tdCloseBrowserTabs(tabs);
 }
 
 /*
@@ -201,7 +201,7 @@ chrome.action.onClicked.addListener((tab) => {
   try {
     chrome.sidePanel.open({ tabId: tab.id }).catch(() => {});
   } catch {}
-  capturePageContext(tab).catch((e) => console.error('[学习助手] 捕获页面上下文失败:', e));
+  capturePageContext(tab).catch((e) => console.error('[webbuddy] failed to capture page context:', e));
 });
 
 /*
@@ -271,7 +271,7 @@ function screenshotSelect() {
     box.style.cssText =
       'position:fixed;border:2px solid #4f6ef7;background:rgba(79,110,247,0.15);z-index:2147483647;display:none;pointer-events:none;';
     const tip = document.createElement('div');
-    tip.textContent = '拖拽框选截图区域，Esc 取消';
+    tip.textContent = 'Drag to select an area · Esc to cancel';
     tip.style.cssText =
       'position:fixed;left:50%;top:16px;transform:translateX(-50%);z-index:2147483647;background:#1f2329;color:#fff;padding:6px 14px;border-radius:8px;font:13px/1.5 sans-serif;';
     document.body.appendChild(overlay);
@@ -332,17 +332,17 @@ function screenshotSelect() {
 
 async function handleScreenshot() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab || tab.id == null) throw new Error('无法获取当前标签页');
+  if (!tab || tab.id == null) throw new Error('Cannot get the current tab');
   // chrome:// 等浏览器内部页面禁止注入/截图，提前给出友好提示
   if (tab.url && /^(chrome|edge|about|chrome-extension|devtools|view-source):/i.test(tab.url)) {
-    throw new Error('浏览器内部页面（' + tab.url.split(':')[0] + '://）不支持截图，请切换到普通网页');
+    throw new Error('Browser internal pages (' + tab.url.split(':')[0] + '://) cannot be captured — switch to a normal web page');
   }
   const results = await chrome.scripting.executeScript({
     target: { tabId: tab.id },
     func: screenshotSelect
   });
   const rect = results && results[0] && results[0].result;
-  if (!rect) throw new Error('已取消');
+  if (!rect) throw new Error('Cancelled');
   const fullDataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'png' });
   return cropScreenshot(fullDataUrl, rect);
 }
@@ -431,11 +431,11 @@ async function dispatchTask(info, tab) {
   let task = null;
   if (info.menuItemId === PAGE_ID) {
     const vars = await buildPageVars(tab);
-    task = { type: 'page', label: '解读当前页面', template: PAGE_SUMMARY_PROMPT, vars };
+    task = { type: 'page', label: 'Explain this page', template: PAGE_SUMMARY_PROMPT, vars };
   } else if (info.menuItemId === CUSTOM_ID) {
     // 自定义问题：顺带刷新页面上下文，便于后续自由追问感知页面
     capturePageContext(tab).catch(() => {});
-    task = { type: 'custom', label: '自定义问题', vars: baseVars };
+    task = { type: 'custom', label: 'Custom question', vars: baseVars };
   } else {
     const prompt = settings.prompts.find((p) => 'prompt:' + p.id === info.menuItemId);
     if (!prompt) return;

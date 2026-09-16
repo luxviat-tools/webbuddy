@@ -3,26 +3,26 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>学习助手 · 设置</title>
+<title>webbuddy · Settings</title>
 <link rel="stylesheet" href="options.css">
 </head>
 <body>
 <main class="page">
 
-  <h1>学习助手 · 设置</h1>
+  <h1>webbuddy · Settings</h1>
 
   <section class="card">
-    <h2>API 配置 <span class="hint">OpenAI 兼容协议，一套通吃</span></h2>
+    <h2>API <span class="hint">OpenAI-compatible — any provider works</span></h2>
     <div class="row">
       <label for="api-baseurl">baseURL</label>
       <div class="field">
         <input id="api-baseurl" type="text" placeholder="https://api.deepseek.com/v1" spellcheck="false" autocomplete="off">
         <div class="quick">
-          快捷填充：
+          Quick fill:
           <button type="button" data-base="https://api.openai.com/v1" data-model="gpt-4o-mini">OpenAI</button>
           <button type="button" data-base="https://api.deepseek.com/v1" data-model="deepseek-flash">DeepSeek</button>
           <button type="button" data-base="https://api.moonshot.cn/v1" data-model="moonshot-v1-8k">Moonshot</button>
-          <button type="button" data-base="https://dashscope.aliyuncs.com/compatible-mode/v1" data-model="qwen-plus">通义</button>
+          <button type="button" data-base="https://dashscope.aliyuncs.com/compatible-mode/v1" data-model="qwen-plus">Qwen</button>
           <button type="button" data-base="http://localhost:11434/v1" data-model="qwen2.5:7b">Ollama</button>
         </div>
       </div>
@@ -31,17 +31,17 @@
       <label for="api-key">apiKey</label>
       <div class="field inline">
         <input id="api-key" type="password" placeholder="sk-…" spellcheck="false" autocomplete="off">
-        <button id="toggle-key" type="button" class="ghost">显示</button>
-        <span class="hint">仅存本机 chrome.storage.local，不上传、不同步</span>
+        <button id="toggle-key" type="button" class="ghost">Show</button>
+        <span class="hint">Stored locally in chrome.storage.local — never uploaded, never synced</span>
       </div>
     </div>
     <div class="row">
       <label for="api-model">model</label>
       <div class="field">
-        <input id="api-model" type="text" list="model-list" placeholder="deepseek-flash（任意模型名，可自由填写）" spellcheck="false" autocomplete="off">
+        <input id="api-model" type="text" list="model-list" placeholder="deepseek-flash (any model name, free text)" spellcheck="false" autocomplete="off">
         <datalist id="model-list">
-          <option value="deepseek-flash">DeepSeek Flash（文本 + 视觉）</option>
-          <option value="deepseek-v4-pro">DeepSeek 深度推理</option>
+          <option value="deepseek-flash">DeepSeek Flash (text + vision)</option>
+          <option value="deepseek-v4-pro">DeepSeek reasoning</option>
           <option value="gpt-4o-mini"></option>
           <option value="moonshot-v1-8k"></option>
           <option value="qwen-plus"></option>
@@ -50,13 +50,13 @@
       </div>
     </div>
     <div class="row">
-      <label for="api-vision">视觉模型</label>
+      <label for="api-vision">Vision model</label>
       <div class="field">
-        <input id="api-vision" type="text" list="vision-list" placeholder="问图时自动使用；DeepSeek 留空即可（视觉已并入 Flash）" spellcheck="false" autocomplete="off">
+        <input id="api-vision" type="text" list="vision-list" placeholder="Used automatically for image questions; leave blank for DeepSeek (vision is in Flash)" spellcheck="false" autocomplete="off">
         <datalist id="vision-list">
-          <option value="deepseek-flash">DeepSeek Flash（原生视觉）</option>
-          <option value="gpt-4o">GPT-4o 视觉</option>
-          <option value="qwen-vl-plus">通义 Qwen-VL</option>
+          <option value="deepseek-flash">DeepSeek Flash (native vision)</option>
+          <option value="gpt-4o">GPT-4o vision</option>
+          <option value="qwen-vl-plus">Qwen-VL</option>
         </datalist>
       </div>
     </div>
@@ -68,62 +68,62 @@
       </div>
     </div>
     <div class="row">
-      <label for="api-stream">流式输出</label>
+      <label for="api-stream">Streaming</label>
       <div class="field inline">
         <input id="api-stream" type="checkbox" checked>
-        <span class="hint">关闭后等待完整回复（不建议）</span>
+        <span class="hint">Turn off to wait for the whole reply (not recommended)</span>
       </div>
     </div>
     <div class="actions">
-      <button id="api-save" type="button" class="primary">保存并授权域名</button>
-      <button id="api-test" type="button" class="ghost">测试连接</button>
+      <button id="api-save" type="button" class="primary">Save &amp; grant origin</button>
+      <button id="api-test" type="button" class="ghost">Test connection</button>
       <span id="api-msg" class="msg"></span>
     </div>
-    <p class="hint block">本插件已申请全局站点访问权限（用于图片控制等常开功能），保存 API 配置无需再单独授权域名。</p>
+    <p class="hint block">This extension already holds broad site access (needed by always-on features such as image control), so saving API settings requires no extra origin grant.</p>
   </section>
 
   <section class="card">
-    <h2>预设问题 <span class="hint">右键「问 AI」子菜单，改动自动保存</span></h2>
-    <p class="hint block">占位符：<code>{{text}}</code> 选中文本 · <code>{{title}}</code> 页面标题 · <code>{{url}}</code> 页面地址 · <code>{{lang}}</code> 浏览器语言</p>
+    <h2>Preset questions <span class="hint">Shown in the right-click “Ask AI” submenu · saved automatically</span></h2>
+    <p class="hint block">Placeholders: <code>{{text}}</code> selection · <code>{{title}}</code> page title · <code>{{url}}</code> page URL · <code>{{lang}}</code> browser language</p>
     <div id="prompt-list"></div>
     <div class="actions">
-      <button id="prompt-add" type="button" class="ghost">＋ 新增</button>
-      <button id="prompt-import" type="button" class="ghost">导入 JSON</button>
-      <button id="prompt-export" type="button" class="ghost">导出 JSON</button>
+      <button id="prompt-add" type="button" class="ghost">＋ Add</button>
+      <button id="prompt-import" type="button" class="ghost">Import JSON</button>
+      <button id="prompt-export" type="button" class="ghost">Export JSON</button>
       <input id="prompt-file" type="file" accept=".json,application/json" hidden>
       <span id="prompt-msg" class="msg"></span>
     </div>
   </section>
 
   <section class="card">
-    <h2>界面与会话 <span class="hint">改动自动保存</span></h2>
+    <h2>Interface &amp; session <span class="hint">saved automatically</span></h2>
     <div class="row">
-      <label for="ui-scope">侧边栏范围</label>
+      <label for="ui-scope">Sidebar scope</label>
       <div class="field">
         <select id="ui-scope">
-          <option value="global">全局共享（v1）</option>
+          <option value="global">Shared globally (v1)</option>
         </select>
       </div>
     </div>
     <div class="row">
-      <label for="ui-keep">保留历史</label>
+      <label for="ui-keep">Keep history</label>
       <div class="field inline">
         <input id="ui-keep" type="checkbox">
-        <span class="hint">历史仅存于当前浏览器会话（storage.session），关闭浏览器自动清空</span>
+        <span class="hint">History lives in the current browser session only (storage.session) and is cleared when you close the browser</span>
       </div>
     </div>
     <div class="row">
-      <label for="ui-max">历史上限</label>
+      <label for="ui-max">History limit</label>
       <div class="field inline">
         <input id="ui-max" type="number" min="1" max="500" step="1">
-        <span class="hint">按问答对数截断</span>
+        <span class="hint">Truncated by number of Q&amp;A pairs</span>
       </div>
     </div>
     <div class="row">
-      <label for="ad-block">免广告</label>
+      <label for="ad-block">Ad block</label>
       <div class="field inline">
         <input id="ad-block" type="checkbox" checked>
-        <span class="hint">CSS 隐藏常见广告容器（默认开启；不拦截下载，个别站点可能误伤界面，遇到可临时关闭）</span>
+        <span class="hint">Hides common ad containers via CSS (on by default). It does not block downloads; a few sites may lose part of their layout — switch it off if that happens.</span>
       </div>
     </div>
     <div class="actions">
