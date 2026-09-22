@@ -700,6 +700,31 @@ function bindUI() {
     pendingImage = null;
     hideShotPreview();
   });
+
+  // 粘贴截图 / 任意图片进对话：从 clipboardData 取 image/* → 复用截图的预览与发送链路。
+  // 走 paste 事件（用户手势），无需 clipboardRead 权限；纯文本粘贴不拦截，照常插入。
+  els.input.addEventListener('paste', (e) => {
+    const items = (e.clipboardData && e.clipboardData.items) || [];
+    let file = null;
+    for (const it of items) {
+      if (it.kind === 'file' && it.type && it.type.startsWith('image/')) {
+        const f = it.getAsFile();
+        if (f) {
+          file = f;
+          break;
+        }
+      }
+    }
+    if (!file) return; // 文本粘贴：保持默认行为
+    e.preventDefault();
+    const reader = new FileReader();
+    reader.onload = () => {
+      pendingImage = reader.result; // dataURL
+      showShotPreview(reader.result);
+    };
+    reader.onerror = () => setStatus('Could not read the pasted image.', 'error', true);
+    reader.readAsDataURL(file);
+  });
 }
 
 /* ================= 截图问图 ================= */
